@@ -4,9 +4,9 @@ Snip is a full-stack URL shortener: create compact links, share them, and see ho
 Every click is recorded after the redirect is served, so analytics never slow down the redirect
 path. The project is built as an npm-workspaces monorepo with a React client and an Express API.
 
-> **Status:** authentication complete. The API now supports registration, login, logout, and
-> session lookup with bcrypt-hashed passwords and an httpOnly JWT cookie. Link management,
-> redirects, analytics, and QR codes are next.
+> **Status:** authentication and link management complete. The API supports registration, login,
+> logout, session lookup, link creation with custom or generated aliases, paginated listing with
+> click totals, editing, and deletion. Redirects, analytics, and QR codes are next.
 
 ## Stack
 
@@ -178,10 +178,45 @@ Rules:
 - JWT tokens expire after seven days. Logout clears the cookie; tokens are stateless, so there is
   no server-side session store.
 
+#### Links
+
+All link endpoints require the auth cookie. Every query is scoped to the authenticated user; an
+id belonging to someone else returns `404 LINK_NOT_FOUND`, never `403`.
+
+| Endpoint                | Request body                                 | Success                                         | Errors                                                        |
+| ----------------------- | -------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------- |
+| `POST /api/links`       | `{ destinationUrl, alias?, expiresAt? }`     | `201` `{ "link": { ... } }`                     | `400 VALIDATION_ERROR`, `409 ALIAS_TAKEN`, `429 RATE_LIMITED` |
+| `GET /api/links`        | query: `page`, `limit`                       | `200` `{ "links": [...], "pagination": {...} }` | `400 VALIDATION_ERROR`                                        |
+| `GET /api/links/:id`    | —                                            | `200` `{ "link": { ... } }`                     | `400 VALIDATION_ERROR`, `404 LINK_NOT_FOUND`                  |
+| `PATCH /api/links/:id`  | `{ destinationUrl?, expiresAt?, isActive? }` | `200` `{ "link": { ... } }`                     | `400 VALIDATION_ERROR`, `404 LINK_NOT_FOUND`                  |
+| `DELETE /api/links/:id` | —                                            | `204`                                           | `400 VALIDATION_ERROR`, `404 LINK_NOT_FOUND`                  |
+
+Link objects contain `id`, `alias`, `shortUrl`, `destinationUrl`, `isActive`, `expiresAt`,
+`createdAt`, and `updatedAt`. List items additionally include `clickCount`, aggregated from the
+clicks table. `shortUrl` is derived from `BASE_URL`. List results are newest first and return
+`pagination: { page, limit, total, totalPages }`; defaults are `page=1`, `limit=20`, and `limit`
+is capped at 100.
+
+Validation rules:
+
+- Destinations must be absolute `http://` or `https://` URLs, at most 2048 characters, with no
+  embedded credentials. The app's own host, `localhost`, and private/loopback IP literals are
+  rejected. Validation uses the WHATWG URL parser, so alternate IPv4 spellings are normalized
+  before checks.
+- Custom aliases are 3–32 characters from `[A-Za-z0-9_-]`, unique with case-sensitive matching,
+  and cannot be a reserved word (`api`, `health`, `login`, `register`, `dashboard`, `admin`,
+  `static`, `assets`, `favicon.ico`, `robots.txt`). Reserved words are checked case-insensitively.
+- Without an alias, a 7-character nanoid is generated; insert collisions are retried up to five
+  times.
+- `expiresAt` must be an ISO 8601 timestamp in the future. `PATCH` accepts `null` to remove an
+  expiry and requires at least one editable field.
+- `POST /api/links` is rate-limited per authenticated user (default 20 per hour, configurable via
+  `LINK_RATE_LIMIT_MAX` and `LINK_RATE_LIMIT_WINDOW_MS`) and returns `429` with `Retry-After`.
+
 ### Planned
 
-Link management, redirect, analytics, and QR endpoints will be documented here as they are
-implemented. The short-link redirect is served from the root path (`GET /:alias`).
+Redirect, analytics, and QR endpoints will be documented here as they are implemented. The
+short-link redirect is served from the root path (`GET /:alias`).
 
 ## Architecture
 
@@ -235,14 +270,24 @@ suite supplies its own deterministic environment values and never touches the de
 - Request logs redact cookies, authorization headers, and password fields.
 - Passwords are hashed with bcrypt at cost 12; cookie-borne JWTs are httpOnly and SameSite=Lax.
 - Login and registration are rate-limited per IP; login failures are deliberately generic.
-- Planned: per-user link rate limits, destination allow-listing (HTTP/HTTPS only), and hashed
-  visitor IDs with no raw IP storage.
+- Link creation is rate-limited per user; destinations are allow-listed to HTTP/HTTPS and
+  private/loopback targets are blocked.
+- Planned: hashed visitor IDs with no raw IP storage and the redirect/analytics surface.
 
 ## Design decisions and assumptions
 
 - **npm workspaces**: one lockfile and root scripts, while each workspace keeps its own dependencies.
 - **Single root `.env`**: shared by the API, Drizzle CLI, and tooling; loaded relative to the repo.
-- **20 links/hour default rate limit**: configurable via environment without a code change.
+- **20 links/hour default rate limit**: applied per authenticated user, configurable via
+  environment without a code change.
+- **Link ownership is enforced in SQL**: list, count, find, update, and delete all include
+  `user_id` in the `WHERE` clause, so another user's link cannot be distinguished from missing.
+- **Alias rules**: uniqueness is case-sensitive in PostgreSQL, while reserved words are checked
+  case-insensitively so `/API` cannot shadow API routes.
+- **Generated aliases retry on collision**: up to five insert attempts, relying on the database's
+  unique index rather than a check-then-insert race.
+- **Private-host blocking is literal only**: hostnames are not resolved, so DNS-based bypasses are
+  out of scope for this assignment. Deployments should also restrict outbound access if needed.
 - **Stateless JWT auth**: a seven-day token in an httpOnly cookie, with no session table. Logout
   removes the cookie; a stolen token could remain valid until expiry.
 - **Normalized emails**: addresses are lowercased before storage and lookup, so
@@ -256,7 +301,7 @@ suite supplies its own deterministic environment values and never touches the de
 
 ## Next steps
 
-1. Link CRUD with ownership checks and rate limiting.
-2. Redirect path with cache, expiry/disabled pages, and click queue.
-3. Analytics aggregation and dashboard charts.
-4. QR codes and unique-visitor reporting.
+1. Redirect path with cache, expiry/disabled pages, and click queue.
+2. Analytics aggregation and dashboard charts.
+3. QR codes and unique-visitor reporting.
+4. Client authentication and link-management screens.
