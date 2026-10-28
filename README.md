@@ -4,10 +4,11 @@ Snip is a full-stack URL shortener: create compact links, share them, and see ho
 Every click is recorded after the redirect is served, so analytics never slow down the redirect
 path. The project is built as an npm-workspaces monorepo with a React client and an Express API.
 
-> **Status:** authentication, link management, and redirects complete. The API supports
-> registration, login, logout, session lookup, link creation with custom or generated aliases,
-> paginated listing with click totals, editing, deletion, and cached redirects that record clicks
-> without blocking the response. Analytics aggregation and QR codes are next.
+> **Status:** authentication, link management, redirects, analytics, and QR codes complete. The API
+> supports registration, login, logout, session lookup, link creation with custom or generated
+> aliases, paginated listing with click totals, editing, deletion, cached redirects that record
+> clicks without blocking the response, per-link analytics, and downloadable SVG QR codes. The
+> client dashboard is next.
 
 ## Stack
 
@@ -185,13 +186,52 @@ Rules:
 All link endpoints require the auth cookie. Every query is scoped to the authenticated user; an
 id belonging to someone else returns `404 LINK_NOT_FOUND`, never `403`.
 
-| Endpoint                | Request body                                 | Success                                         | Errors                                                        |
-| ----------------------- | -------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------- |
-| `POST /api/links`       | `{ destinationUrl, alias?, expiresAt? }`     | `201` `{ "link": { ... } }`                     | `400 VALIDATION_ERROR`, `409 ALIAS_TAKEN`, `429 RATE_LIMITED` |
-| `GET /api/links`        | query: `page`, `limit`                       | `200` `{ "links": [...], "pagination": {...} }` | `400 VALIDATION_ERROR`                                        |
-| `GET /api/links/:id`    | —                                            | `200` `{ "link": { ... } }`                     | `400 VALIDATION_ERROR`, `404 LINK_NOT_FOUND`                  |
-| `PATCH /api/links/:id`  | `{ destinationUrl?, expiresAt?, isActive? }` | `200` `{ "link": { ... } }`                     | `400 VALIDATION_ERROR`, `404 LINK_NOT_FOUND`                  |
-| `DELETE /api/links/:id` | —                                            | `204`                                           | `400 VALIDATION_ERROR`, `404 LINK_NOT_FOUND`                  |
+| Endpoint                       | Request body                                 | Success                                         | Errors                                                        |
+| ------------------------------ | -------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------- |
+| `POST /api/links`              | `{ destinationUrl, alias?, expiresAt? }`     | `201` `{ "link": { ... } }`                     | `400 VALIDATION_ERROR`, `409 ALIAS_TAKEN`, `429 RATE_LIMITED` |
+| `GET /api/links`               | query: `page`, `limit`                       | `200` `{ "links": [...], "pagination": {...} }` | `400 VALIDATION_ERROR`                                        |
+| `GET /api/links/:id`           | —                                            | `200` `{ "link": { ... } }`                     | `400 VALIDATION_ERROR`, `404 LINK_NOT_FOUND`                  |
+| `GET /api/links/:id/analytics` | query: `range`                               | `200` analytics object                          | `400 VALIDATION_ERROR`, `404 LINK_NOT_FOUND`                  |
+| `GET /api/links/:id/qr`        | —                                            | `200` SVG image                                 | `400 VALIDATION_ERROR`, `404 LINK_NOT_FOUND`                  |
+| `PATCH /api/links/:id`         | `{ destinationUrl?, expiresAt?, isActive? }` | `200` `{ "link": { ... } }`                     | `400 VALIDATION_ERROR`, `404 LINK_NOT_FOUND`                  |
+| `DELETE /api/links/:id`        | —                                            | `204`                                           | `400 VALIDATION_ERROR`, `404 LINK_NOT_FOUND`                  |
+
+### Analytics
+
+`GET /api/links/:id/analytics?range=7d|30d|90d` returns range-scoped analytics for one owned link.
+The default range is `7d`. Ranges cover the current UTC day plus the preceding 6, 29, or 89 days;
+`from` is inclusive and `to` is exclusive. An id belonging to another user returns
+`404 LINK_NOT_FOUND`.
+
+```json
+{
+  "linkId": "e2c1…",
+  "range": "7d",
+  "from": "2026-10-22T00:00:00.000Z",
+  "to": "2026-10-29T00:00:00.000Z",
+  "totals": { "totalClicks": 120, "uniqueVisitors": 87 },
+  "clicksOverTime": [{ "date": "2026-10-22", "clicks": 0 }],
+  "topReferrers": [{ "referrer": "news.example.org", "clicks": 42 }],
+  "deviceSplit": [{ "deviceType": "mobile", "clicks": 70 }],
+  "browserSplit": [{ "browser": "Chrome", "clicks": 55 }]
+}
+```
+
+- `clicksOverTime` always contains one entry per UTC day in the range, including zero-click days.
+  `generate_series` builds the calendar in PostgreSQL and the gap fill is a `LEFT JOIN`, not an
+  application-side loop.
+- `totals` counts rows and distinct `visitor_hash` values in the same window.
+- `topReferrers` returns at most 10 hosts ordered by clicks; clicks without a referrer are grouped
+  as `Direct`.
+- `deviceSplit` and `browserSplit` are ordered by clicks descending.
+- Every aggregation runs in SQL over the `(link_id, clicked_at)` index.
+
+### QR codes
+
+`GET /api/links/:id/qr` returns an SVG QR code for the link's short URL with
+`Content-Type: image/svg+xml`. The response is marked `Cache-Control: private, max-age=86400` and
+names the download `snip-<alias>.svg`. Like every link endpoint, it requires the auth cookie and
+returns `404 LINK_NOT_FOUND` for another user's link.
 
 Link objects contain `id`, `alias`, `shortUrl`, `destinationUrl`, `isActive`, `expiresAt`,
 `createdAt`, and `updatedAt`. List items additionally include `clickCount`, aggregated from the
@@ -241,7 +281,7 @@ unique-visitor counts reset at UTC midnight.
 
 ### Planned
 
-Analytics aggregation and QR endpoints will be documented here as they are implemented.
+The client dashboard — link management, analytics charts, and QR download — is still to come.
 
 ## Architecture
 
@@ -313,6 +353,11 @@ suite supplies its own deterministic environment values and never touches the de
   environment without a code change.
 - **Link ownership is enforced in SQL**: list, count, find, update, and delete all include
   `user_id` in the `WHERE` clause, so another user's link cannot be distinguished from missing.
+  Analytics and QR resolve the owned link first and return `404` before touching click data.
+- **Analytics windows are UTC-aligned**: ranges end at the current UTC day, `to` is exclusive, and
+  `generate_series` fills empty days in SQL so every response has a fixed number of buckets.
+- **QR codes are SVG**: the server returns text-based SVG instead of rasterising a PNG, keeping the
+  endpoint dependency-light and the code sharp at any display size.
 - **Alias rules**: uniqueness is case-sensitive in PostgreSQL, while reserved words are checked
   case-insensitively so `/API` cannot shadow API routes.
 - **Generated aliases retry on collision**: up to five insert attempts, relying on the database's
@@ -332,6 +377,6 @@ suite supplies its own deterministic environment values and never touches the de
 
 ## Next steps
 
-1. Analytics aggregation and dashboard charts.
-2. QR codes and unique-visitor reporting.
-3. Client authentication and link-management screens.
+1. Client authentication and link-management screens.
+2. Analytics dashboard with charts for clicks over time, referrers, and device/browser splits.
+3. QR code display and download in the client.
