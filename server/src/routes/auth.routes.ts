@@ -1,21 +1,8 @@
-import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
-import type { Options } from 'express-rate-limit';
 import { login, logout, me, register } from '../controllers/auth.controller.js';
+import { createRateLimitHandler } from '../middleware/rate-limit.js';
 import { requireAuth } from '../middleware/require-auth.js';
-
-interface RateLimitMessage {
-  code: string;
-  message: string;
-}
-
-function rateLimitHandler({ code, message }: RateLimitMessage) {
-  return (_req: Request, res: Response, _next: NextFunction, options: Options): void => {
-    res.setHeader('Retry-After', String(Math.ceil(options.windowMs / 1000)));
-    res.status(429).json({ error: { code, message } });
-  };
-}
 
 export function createAuthRouter(): Router {
   const loginLimiter = rateLimit({
@@ -24,7 +11,7 @@ export function createAuthRouter(): Router {
     standardHeaders: 'draft-8',
     legacyHeaders: false,
     skipSuccessfulRequests: true,
-    handler: rateLimitHandler({
+    handler: createRateLimitHandler({
       code: 'RATE_LIMITED',
       message: 'Too many login attempts. Please try again later.',
     }),
@@ -35,7 +22,7 @@ export function createAuthRouter(): Router {
     limit: 5,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
-    handler: rateLimitHandler({
+    handler: createRateLimitHandler({
       code: 'RATE_LIMITED',
       message: 'Too many registration attempts. Please try again later.',
     }),

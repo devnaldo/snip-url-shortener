@@ -1,12 +1,12 @@
 import type { Request, Response } from 'express';
 import { AppError } from '../errors/app-error.js';
 import { clearAuthCookie, setAuthCookie } from '../lib/auth-cookie.js';
-import { parseBody } from '../lib/validation.js';
+import { parseInput } from '../lib/validation.js';
 import * as authService from '../services/auth.service.js';
 import { loginSchema, registerSchema } from '../validation/auth.schema.js';
 
 export async function register(req: Request, res: Response): Promise<void> {
-  const input = parseBody(registerSchema, req.body as unknown);
+  const input = parseInput(registerSchema, req.body as unknown);
   const result = await authService.register(input);
 
   setAuthCookie(res, result.token);
@@ -14,7 +14,7 @@ export async function register(req: Request, res: Response): Promise<void> {
 }
 
 export async function login(req: Request, res: Response): Promise<void> {
-  const input = parseBody(loginSchema, req.body as unknown);
+  const input = parseInput(loginSchema, req.body as unknown);
   const result = await authService.login(input);
 
   setAuthCookie(res, result.token);

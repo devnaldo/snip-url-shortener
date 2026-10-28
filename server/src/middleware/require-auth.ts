@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { AppError } from '../errors/app-error.js';
 import { AUTH_COOKIE_NAME } from '../lib/auth-cookie.js';
 import { verifyAuthToken } from '../lib/auth-token.js';
+import type { AuthContext } from '../types/auth.js';
 
 function readCookie(req: Request, name: string): string | undefined {
   const cookies: unknown = req.cookies;
@@ -31,4 +32,13 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
 
   req.auth = { userId };
   next();
+}
+
+/** Read the authenticated context after requireAuth. Throws if it is missing. */
+export function getAuthContext(req: Request): AuthContext {
+  if (!req.auth) {
+    throw new AppError(401, 'UNAUTHENTICATED', 'Authentication required.');
+  }
+
+  return req.auth;
 }
