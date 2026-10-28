@@ -4,9 +4,10 @@ Snip is a full-stack URL shortener: create compact links, share them, and see ho
 Every click is recorded after the redirect is served, so analytics never slow down the redirect
 path. The project is built as an npm-workspaces monorepo with a React client and an Express API.
 
-> **Status:** authentication and link management complete. The API supports registration, login,
-> logout, session lookup, link creation with custom or generated aliases, paginated listing with
-> click totals, editing, and deletion. Redirects, analytics, and QR codes are next.
+> **Status:** authentication, link management, and redirects complete. The API supports
+> registration, login, logout, session lookup, link creation with custom or generated aliases,
+> paginated listing with click totals, editing, deletion, and cached redirects that record clicks
+> without blocking the response. Analytics aggregation and QR codes are next.
 
 ## Stack
 
@@ -111,6 +112,7 @@ The Vite dev server proxies `/api` and `/health` to the API, so the client can u
 | `CLIENT_URL`                | yes      | —             | Frontend origin allowed by CORS.                                 |
 | `JWT_SECRET`                | yes      | —             | Auth token signing key, minimum 32 characters.                   |
 | `CLICK_HASH_SECRET`         | yes      | —             | Secret used to derive the daily salt for visitor hashes.         |
+| `TRUST_PROXY`               | no       | `0`           | Number of trusted reverse-proxy hops for the client IP.          |
 | `LINK_RATE_LIMIT_MAX`       | no       | `20`          | Maximum links a user may create per window.                      |
 | `LINK_RATE_LIMIT_WINDOW_MS` | no       | `3600000`     | Link-creation rate-limit window in milliseconds.                 |
 
@@ -213,10 +215,33 @@ Validation rules:
 - `POST /api/links` is rate-limited per authenticated user (default 20 per hour, configurable via
   `LINK_RATE_LIMIT_MAX` and `LINK_RATE_LIMIT_WINDOW_MS`) and returns `429` with `Retry-After`.
 
+### Redirects
+
+`GET /:alias` is mounted at the server root, after `/health` and `/api`, so those prefixes always
+win over an alias. It is intentionally **not** part of the `/api` surface: visitors get a `302` to
+the destination, or a standalone HTML page when the link cannot be followed.
+
+| Case                       | Status | Response                                        |
+| -------------------------- | ------ | ----------------------------------------------- |
+| Active link                | `302`  | `Location` set to the destination               |
+| Expired link               | `410`  | HTML page explaining that the link expired      |
+| Disabled link              | `410`  | HTML page explaining that the link was disabled |
+| Unknown or malformed alias | `404`  | HTML page explaining that the link is missing   |
+
+All redirect and notice responses send `Cache-Control: no-store`. Aliases are matched
+case-sensitively and must be 3–32 characters from `[A-Za-z0-9_-]`; anything else is rejected
+before a database query.
+
+Clicks are recorded with the timestamp, referrer host and URL (http/https only), device type
+(`desktop`, `mobile`, `tablet`, `bot`, or `unknown`), browser, OS, and a visitor hash. User agents
+are parsed with `ua-parser-js`; bot detection uses its bot-detection extension. The visitor hash is
+`sha256(ip + user-agent + daily salt)`, where the salt is an HMAC of the UTC date keyed by
+`CLICK_HASH_SECRET`. Raw IP addresses are never stored or logged. Because the salt rotates daily,
+unique-visitor counts reset at UTC midnight.
+
 ### Planned
 
-Redirect, analytics, and QR endpoints will be documented here as they are implemented. The
-short-link redirect is served from the root path (`GET /:alias`).
+Analytics aggregation and QR endpoints will be documented here as they are implemented.
 
 ## Architecture
 
@@ -228,8 +253,13 @@ config, logging, error handling) live in `config/`, `lib/`, and `middleware/`.
 
 The redirect path performs an in-memory LRU lookup (60-second TTL) before falling back to a single
 indexed query. Click events are written to an in-process queue and batch-inserted after the response
-has been sent, so analytics can never block or fail a redirect. Cache entries are invalidated on
-edit, disable, enable, and delete.
+has been sent, so analytics can never block or fail a redirect. The queue flushes every second, when
+100 events are buffered, or on graceful shutdown; it is bounded at 10,000 events, and a failed
+insert is logged and discarded. Cache entries are invalidated on edit, disable, enable, and delete.
+
+`TRUST_PROXY` controls how many reverse-proxy hops Express trusts when deriving `req.ip` from
+`X-Forwarded-For`. It defaults to `0` (direct connections only). Set it to the exact number of
+proxies in front of the API; trusting more hops than exist lets clients spoof their IP.
 
 ### Why `302` instead of `301`
 
@@ -272,7 +302,8 @@ suite supplies its own deterministic environment values and never touches the de
 - Login and registration are rate-limited per IP; login failures are deliberately generic.
 - Link creation is rate-limited per user; destinations are allow-listed to HTTP/HTTPS and
   private/loopback targets are blocked.
-- Planned: hashed visitor IDs with no raw IP storage and the redirect/analytics surface.
+- Visitor IDs are daily-rotating hashes; raw IP addresses are never persisted or logged.
+- Redirect failure pages escape every interpolated value and include no user-controlled HTML.
 
 ## Design decisions and assumptions
 
@@ -301,7 +332,6 @@ suite supplies its own deterministic environment values and never touches the de
 
 ## Next steps
 
-1. Redirect path with cache, expiry/disabled pages, and click queue.
-2. Analytics aggregation and dashboard charts.
-3. QR codes and unique-visitor reporting.
-4. Client authentication and link-management screens.
+1. Analytics aggregation and dashboard charts.
+2. QR codes and unique-visitor reporting.
+3. Client authentication and link-management screens.
