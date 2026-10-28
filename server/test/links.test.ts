@@ -5,6 +5,7 @@ import { createApp } from '../src/app.js';
 import type { Link } from '../src/db/schema.js';
 import { AUTH_COOKIE_NAME } from '../src/lib/auth-cookie.js';
 import { signAuthToken } from '../src/lib/auth-token.js';
+import { clearRedirectCache, getCachedLink, setCachedLink } from '../src/lib/redirect-cache.js';
 import {
   countLinksByUser,
   deleteLinkForUser,
@@ -73,6 +74,7 @@ let app: Express;
 
 beforeEach(() => {
   vi.resetAllMocks();
+  clearRedirectCache();
   app = createApp();
 });
 
@@ -413,6 +415,26 @@ describe('PATCH /api/links/:id', () => {
     expect(args[2].updatedAt).toBeInstanceOf(Date);
   });
 
+  it('invalidates the redirect cache after an update', async () => {
+    setCachedLink('abc1234', {
+      id: LINK_ID,
+      destinationUrl: 'https://old.example.com',
+      isActive: true,
+      expiresAt: null,
+    });
+    updateLinkForUserMock.mockResolvedValue(
+      makeLink({ destinationUrl: 'https://new.example.com' }),
+    );
+
+    const response = await request(app)
+      .patch(`/api/links/${LINK_ID}`)
+      .set('Cookie', authCookie())
+      .send({ destinationUrl: 'https://new.example.com' });
+
+    expect(response.status).toBe(200);
+    expect(getCachedLink('abc1234')).toBeUndefined();
+  });
+
   it('rejects an empty update', async () => {
     const response = await request(app)
       .patch(`/api/links/${LINK_ID}`)
@@ -465,8 +487,23 @@ describe('PATCH /api/links/:id', () => {
 });
 
 describe('DELETE /api/links/:id', () => {
+  it('invalidates the redirect cache after a delete', async () => {
+    setCachedLink('abc1234', {
+      id: LINK_ID,
+      destinationUrl: 'https://example.com',
+      isActive: true,
+      expiresAt: null,
+    });
+    deleteLinkForUserMock.mockResolvedValue('abc1234');
+
+    const response = await request(app).delete(`/api/links/${LINK_ID}`).set('Cookie', authCookie());
+
+    expect(response.status).toBe(204);
+    expect(getCachedLink('abc1234')).toBeUndefined();
+  });
+
   it('deletes an owned link', async () => {
-    deleteLinkForUserMock.mockResolvedValue(true);
+    deleteLinkForUserMock.mockResolvedValue('abc1234');
 
     const response = await request(app).delete(`/api/links/${LINK_ID}`).set('Cookie', authCookie());
 
@@ -476,7 +513,7 @@ describe('DELETE /api/links/:id', () => {
   });
 
   it('returns 404 when the link is not owned', async () => {
-    deleteLinkForUserMock.mockResolvedValue(false);
+    deleteLinkForUserMock.mockResolvedValue(undefined);
 
     const response = await request(app)
       .delete(`/api/links/${LINK_ID}`)

@@ -66,6 +66,12 @@ export async function countLinksByUser(userId: string): Promise<number> {
   return row?.total ?? 0;
 }
 
+export async function findLinkByAlias(alias: string): Promise<Link | undefined> {
+  const [link] = await db.select().from(links).where(eq(links.alias, alias)).limit(1);
+
+  return link;
+}
+
 export async function findLinkForUser(id: string, userId: string): Promise<Link | undefined> {
   const [link] = await db
     .select()
@@ -90,11 +96,12 @@ export async function updateLinkForUser(
   return link;
 }
 
-export async function deleteLinkForUser(id: string, userId: string): Promise<boolean> {
+/** Delete an owned link and return its alias so the redirect cache can be invalidated. */
+export async function deleteLinkForUser(id: string, userId: string): Promise<string | undefined> {
   const [deleted] = await db
     .delete(links)
     .where(and(eq(links.id, id), eq(links.userId, userId)))
-    .returning({ id: links.id });
+    .returning({ alias: links.alias });
 
-  return deleted !== undefined;
+  return deleted?.alias;
 }

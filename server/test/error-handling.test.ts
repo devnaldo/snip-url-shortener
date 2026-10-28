@@ -6,7 +6,9 @@ const app = createApp();
 
 describe('error handling', () => {
   it('returns a consistent 404 body for unknown routes', async () => {
-    const response = await request(app).get('/does-not-exist');
+    // Single-segment paths are handled by the alias redirect route, so use a
+    // nested path to exercise the JSON not-found handler.
+    const response = await request(app).get('/nested/unknown/route');
 
     expect(response.status).toBe(404);
     expect(response.body).toEqual({

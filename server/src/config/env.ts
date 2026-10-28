@@ -18,6 +18,7 @@ const envSchema = z.object({
   CLIENT_URL: z.url(),
   BASE_URL: z.url(),
   CLICK_HASH_SECRET: z.string().min(32, 'Must be at least 32 characters long'),
+  TRUST_PROXY: z.coerce.number().int().min(0).max(10).default(0),
   LINK_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
   LINK_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(3_600_000),
 });

@@ -9,6 +9,10 @@ export const logger = pino({
     paths: [
       'req.headers.cookie',
       'req.headers.authorization',
+      'req.headers["x-forwarded-for"]',
+      'req.headers["x-real-ip"]',
+      'req.remoteAddress',
+      'req.remotePort',
       'res.headers["set-cookie"]',
       'password',
       'passwordHash',

@@ -4,6 +4,7 @@ import { AppError } from '../errors/app-error.js';
 import { generateAlias } from '../lib/alias.js';
 import { isUniqueViolation } from '../lib/db-errors.js';
 import { logger } from '../lib/logger.js';
+import { invalidateCachedLink } from '../lib/redirect-cache.js';
 import {
   countLinksByUser,
   deleteLinkForUser,
@@ -166,13 +167,17 @@ export async function updateLink(
     throw linkNotFoundError();
   }
 
+  invalidateCachedLink(link.alias);
+
   return toLinkDto(link);
 }
 
 export async function deleteLink(userId: string, id: string): Promise<void> {
-  const deleted = await deleteLinkForUser(id, userId);
+  const alias = await deleteLinkForUser(id, userId);
 
-  if (!deleted) {
+  if (alias === undefined) {
     throw linkNotFoundError();
   }
+
+  invalidateCachedLink(alias);
 }

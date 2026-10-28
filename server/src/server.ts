@@ -1,11 +1,14 @@
 import { createServer } from 'node:http';
-import { createApp } from './app.js';
+import { createApp, getClickQueue } from './app.js';
 import { env } from './config/env.js';
 import { closeDb } from './db/client.js';
 import { logger } from './lib/logger.js';
 
 const app = createApp();
+const clickQueue = getClickQueue(app);
 const server = createServer(app);
+
+clickQueue.start();
 
 server.listen(env.PORT, () => {
   logger.info({ port: env.PORT, env: env.NODE_ENV }, 'Snip API listening');
@@ -28,19 +31,27 @@ function shutdown(signal: NodeJS.Signals): void {
   server.close((error) => {
     clearTimeout(forceTimer);
 
-    void closeDb()
-      .catch((dbError: unknown) => {
-        logger.error({ err: dbError }, 'Error while closing database pool');
-      })
-      .finally(() => {
-        if (error) {
-          logger.error({ err: error }, 'Error while closing HTTP server');
-          process.exit(1);
-        }
+    void (async () => {
+      try {
+        await clickQueue.stop();
+      } catch (queueError) {
+        logger.error({ err: queueError }, 'Error while flushing click queue');
+      }
 
-        logger.info('Shutdown complete');
-        process.exit(0);
-      });
+      try {
+        await closeDb();
+      } catch (dbError) {
+        logger.error({ err: dbError }, 'Error while closing database pool');
+      }
+
+      if (error) {
+        logger.error({ err: error }, 'Error while closing HTTP server');
+        process.exit(1);
+      }
+
+      logger.info('Shutdown complete');
+      process.exit(0);
+    })();
   });
 }
 
