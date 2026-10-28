@@ -1,0 +1,24 @@
+name: snip
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: snip-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-snip}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-snip}
+      POSTGRES_DB: ${POSTGRES_DB:-snip}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - snip-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-snip} -d ${POSTGRES_DB:-snip}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  snip-db-data:
