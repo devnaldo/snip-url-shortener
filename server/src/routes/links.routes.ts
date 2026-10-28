@@ -8,6 +8,8 @@ import {
   listLinks,
   updateLink,
 } from '../controllers/links.controller.js';
+import { getLinkAnalytics } from '../controllers/analytics.controller.js';
+import { getLinkQr } from '../controllers/qr.controller.js';
 import { createRateLimitHandler } from '../middleware/rate-limit.js';
 import { requireAuth } from '../middleware/require-auth.js';
 
@@ -30,6 +32,8 @@ export function createLinksRouter(): Router {
   router.use(requireAuth);
   router.post('/', createLinkLimiter, createLink);
   router.get('/', listLinks);
+  router.get('/:id/analytics', getLinkAnalytics);
+  router.get('/:id/qr', getLinkQr);
   router.get('/:id', getLink);
   router.patch('/:id', updateLink);
   router.delete('/:id', deleteLink);

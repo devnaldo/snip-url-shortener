@@ -1,10 +1,10 @@
-import { env } from '../config/env.js';
 import type { Link } from '../db/schema.js';
 import { AppError } from '../errors/app-error.js';
 import { generateAlias } from '../lib/alias.js';
 import { isUniqueViolation } from '../lib/db-errors.js';
 import { logger } from '../lib/logger.js';
 import { invalidateCachedLink } from '../lib/redirect-cache.js';
+import { buildShortUrl } from '../lib/short-url.js';
 import {
   countLinksByUser,
   deleteLinkForUser,
@@ -51,7 +51,7 @@ function toLinkDto(link: Link): LinkDto {
   return {
     id: link.id,
     alias: link.alias,
-    shortUrl: `${env.BASE_URL.replace(/\/+$/, '')}/${link.alias}`,
+    shortUrl: buildShortUrl(link.alias),
     destinationUrl: link.destinationUrl,
     isActive: link.isActive,
     expiresAt: link.expiresAt ? link.expiresAt.toISOString() : null,
