@@ -3,5 +3,5 @@ dist/
 build/
 coverage/
 package-lock.json
-server/drizzle/**/*.sql
+server/drizzle/
 AGENTS.md
