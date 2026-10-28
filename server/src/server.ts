@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { createApp } from './app.js';
 import { env } from './config/env.js';
+import { closeDb } from './db/client.js';
 import { logger } from './lib/logger.js';
 
 const app = createApp();
@@ -27,13 +28,19 @@ function shutdown(signal: NodeJS.Signals): void {
   server.close((error) => {
     clearTimeout(forceTimer);
 
-    if (error) {
-      logger.error({ err: error }, 'Error while closing HTTP server');
-      process.exit(1);
-    }
+    void closeDb()
+      .catch((dbError: unknown) => {
+        logger.error({ err: dbError }, 'Error while closing database pool');
+      })
+      .finally(() => {
+        if (error) {
+          logger.error({ err: error }, 'Error while closing HTTP server');
+          process.exit(1);
+        }
 
-    logger.info('Shutdown complete');
-    process.exit(0);
+        logger.info('Shutdown complete');
+        process.exit(0);
+      });
   });
 }
 
