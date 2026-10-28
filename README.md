@@ -4,9 +4,9 @@ Snip is a full-stack URL shortener: create compact links, share them, and see ho
 Every click is recorded after the redirect is served, so analytics never slow down the redirect
 path. The project is built as an npm-workspaces monorepo with a React client and an Express API.
 
-> **Status:** scaffold. Tooling, environment validation, logging, the database schema, and the
-> health endpoint are in place. Authentication, link management, redirects, analytics, and QR
-> codes are next.
+> **Status:** authentication complete. The API now supports registration, login, logout, and
+> session lookup with bcrypt-hashed passwords and an httpOnly JWT cookie. Link management,
+> redirects, analytics, and QR codes are next.
 
 ## Stack
 
@@ -153,10 +153,35 @@ All API errors use one shape:
 
 Returns `200` with `{ "status": "ok", "service": "snip-api", "uptime": 12, "timestamp": "..." }`.
 
+#### Authentication
+
+Auth responses set a `snip_token` cookie: `HttpOnly`, `SameSite=Lax`, `Path=/`, `Secure` in
+production, with a seven-day expiry. The cookie contains a signed HS256 JWT; no token is ever
+returned in a JSON body. Request bodies are validated with Zod.
+
+| Endpoint                  | Request body              | Success                                      | Errors                                                                |
+| ------------------------- | ------------------------- | -------------------------------------------- | --------------------------------------------------------------------- |
+| `POST /api/auth/register` | `{ "email", "password" }` | `201` `{ "user": { id, email, createdAt } }` | `400 VALIDATION_ERROR`, `409 EMAIL_TAKEN`, `429 RATE_LIMITED`         |
+| `POST /api/auth/login`    | `{ "email", "password" }` | `200` `{ "user": { id, email, createdAt } }` | `400 VALIDATION_ERROR`, `401 INVALID_CREDENTIALS`, `429 RATE_LIMITED` |
+| `POST /api/auth/logout`   | —                         | `204` and an expired cookie                  | —                                                                     |
+| `GET /api/auth/me`        | — (cookie required)       | `200` `{ "user": { id, email, createdAt } }` | `401 UNAUTHENTICATED`                                                 |
+
+Rules:
+
+- Emails must be valid and are normalized to lowercase; the database enforces uniqueness.
+- Passwords must be 8–72 characters. The upper bound matches bcrypt's 72-byte input limit.
+- Passwords are hashed with bcrypt at cost 12; hashes are never returned by the API.
+- Login failures return the same generic error whether the email or the password is wrong.
+- Registration is limited to 5 attempts per IP per hour. Login is limited to 10 attempts per IP
+  per 15 minutes; successful logins do not count toward the limit. Both return `429` with a
+  `Retry-After` header.
+- JWT tokens expire after seven days. Logout clears the cookie; tokens are stateless, so there is
+  no server-side session store.
+
 ### Planned
 
-Authentication, link management, redirect, analytics, and QR endpoints will be documented here as
-they are implemented. The short-link redirect is served from the root path (`GET /:alias`).
+Link management, redirect, analytics, and QR endpoints will be documented here as they are
+implemented. The short-link redirect is served from the root path (`GET /:alias`).
 
 ## Architecture
 
@@ -208,22 +233,30 @@ suite supplies its own deterministic environment values and never touches the de
 - Environment configuration is validated with Zod at startup.
 - Errors are normalized; stack traces and database details are never sent to clients.
 - Request logs redact cookies, authorization headers, and password fields.
-- Planned: bcrypt (cost 12) password hashing, httpOnly JWT cookies, per-user link rate limits,
-  destination allow-listing (HTTP/HTTPS only), and hashed visitor IDs with no raw IP storage.
+- Passwords are hashed with bcrypt at cost 12; cookie-borne JWTs are httpOnly and SameSite=Lax.
+- Login and registration are rate-limited per IP; login failures are deliberately generic.
+- Planned: per-user link rate limits, destination allow-listing (HTTP/HTTPS only), and hashed
+  visitor IDs with no raw IP storage.
 
 ## Design decisions and assumptions
 
 - **npm workspaces**: one lockfile and root scripts, while each workspace keeps its own dependencies.
 - **Single root `.env`**: shared by the API, Drizzle CLI, and tooling; loaded relative to the repo.
 - **20 links/hour default rate limit**: configurable via environment without a code change.
+- **Stateless JWT auth**: a seven-day token in an httpOnly cookie, with no session table. Logout
+  removes the cookie; a stolen token could remain valid until expiry.
+- **Normalized emails**: addresses are lowercased before storage and lookup, so
+  `User@Example.com` and `user@example.com` cannot create separate accounts.
+- **Password length cap**: 72 characters, because bcrypt ignores input beyond that limit.
+- **Fixed auth rate limits**: registration (5/hour) and login (10/15 minutes) are constants; the
+  spec exposes only the link-creation limit through environment variables.
 - **Demo seed data is safe**: only for local development; credentials are documented and non-secret.
 - **Safer defaults**: secrets must be explicitly provided and have a minimum length; there are no
   insecure fallback secrets.
 
 ## Next steps
 
-1. Authentication (register, login, logout, session endpoint).
-2. Link CRUD with ownership checks and rate limiting.
-3. Redirect path with cache, expiry/disabled pages, and click queue.
-4. Analytics aggregation and dashboard charts.
-5. QR codes and unique-visitor reporting.
+1. Link CRUD with ownership checks and rate limiting.
+2. Redirect path with cache, expiry/disabled pages, and click queue.
+3. Analytics aggregation and dashboard charts.
+4. QR codes and unique-visitor reporting.
