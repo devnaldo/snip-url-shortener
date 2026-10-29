@@ -6,7 +6,7 @@ export function cn(...values: Array<string | false | null | undefined>): string 
 export const inputClassName = (invalid = false): string =>
   cn(
     'block h-9 w-full rounded-md border bg-surface px-3 text-[0.8125rem] text-ink',
-    'transition-colors duration-150 placeholder:text-subtle',
+    'transition-[border-color,background-color,color] duration-150 placeholder:text-subtle',
     'hover:border-line-strong',
     'disabled:cursor-not-allowed disabled:border-line disabled:bg-surface-2 disabled:text-subtle',
     invalid ? 'border-danger' : 'border-line',
