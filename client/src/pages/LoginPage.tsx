@@ -6,6 +6,8 @@ import { useAuth } from '../auth/useAuth';
 import { AuthLayout } from '../components/AuthLayout';
 import { Button } from '../components/Button';
 import { Field } from '../components/Field';
+import { AlertIcon } from '../components/Icons';
+import { fieldDescribedBy } from '../lib/a11y';
 import { inputClassName } from '../lib/styles';
 import { useToast } from '../toast/useToast';
 
@@ -82,7 +84,7 @@ export function LoginPage() {
           New to Snip?{' '}
           <Link
             to="/register"
-            className="font-medium text-indigo-600 hover:text-indigo-700 focus-visible:outline-none focus-visible:underline"
+            className="font-medium text-accent underline-offset-4 hover:underline"
           >
             Create an account
           </Link>
@@ -93,9 +95,10 @@ export function LoginPage() {
         {formError ? (
           <div
             role="alert"
-            className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+            className="flex items-start gap-2 rounded-md border border-danger/40 bg-danger-soft px-3 py-2 text-[0.6875rem] leading-relaxed text-danger"
           >
-            {formError}
+            <AlertIcon className="mt-px h-3.5 w-3.5 shrink-0" />
+            <span>{formError}</span>
           </div>
         ) : null}
 
@@ -112,7 +115,7 @@ export function LoginPage() {
               clearFieldError('email');
             }}
             aria-invalid={errors.email ? true : undefined}
-            aria-describedby={errors.email ? 'email-error' : undefined}
+            aria-describedby={fieldDescribedBy('email', { error: Boolean(errors.email) })}
             className={inputClassName(Boolean(errors.email))}
             placeholder="you@example.com"
             required
@@ -131,7 +134,7 @@ export function LoginPage() {
               clearFieldError('password');
             }}
             aria-invalid={errors.password ? true : undefined}
-            aria-describedby={errors.password ? 'password-error' : undefined}
+            aria-describedby={fieldDescribedBy('password', { error: Boolean(errors.password) })}
             className={inputClassName(Boolean(errors.password))}
             placeholder="Your password"
             required
