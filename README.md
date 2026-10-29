@@ -147,6 +147,29 @@ npm run dev
 
 The Vite dev server proxies `/api` and `/health` to the API, so the client can use relative URLs.
 
+### 6. Run a production build
+
+```bash
+npm run build
+npm start
+```
+
+`npm run build` compiles the server to `server/dist` and the client to `client/dist`. The Express
+server then serves the built client itself, from the same origin as the API:
+
+- Hashed files under `/assets/*` are served with `Cache-Control: public, max-age=31536000,
+immutable`; `index.html` is served with `Cache-Control: no-cache` so new deploys are picked up.
+- The SPA fallback responds with `index.html` for `GET /`, `/login`, `/register`, and paths under
+  `/links/` only. There is deliberately no wildcard fallback: every other single-segment path still
+  reaches the alias redirect router, so `/abc1234` keeps working.
+- Static serving and the fallback are registered only when `client/dist/index.html` exists. Running
+  `npm run dev` or the test suite without a build therefore behaves exactly as before.
+- The CSP keeps Helmet's defaults and adds `blob:` to `img-src` (`'self' data: blob:`) for the
+  authenticated QR-code object URLs. No other directive is loosened.
+
+Because the client uses relative `/api` URLs and a `SameSite=Lax` cookie, a production deployment
+should terminate TLS at a reverse proxy and forward both the API and client requests to this server.
+
 ## Environment variables
 
 | Variable                    | Required | Default       | Description                                                      |
@@ -168,20 +191,20 @@ development only and are not suitable for a deployed database.
 
 ## Scripts
 
-| Command                    | Description                                         |
-| -------------------------- | --------------------------------------------------- |
-| `npm run dev`              | Run the API and client together.                    |
-| `npm run build`            | Build the server and client for production.         |
-| `npm start`                | Start the compiled API.                             |
-| `npm test`                 | Run all workspace test suites.                      |
-| `npm run typecheck`        | Type-check every workspace.                         |
-| `npm run lint`             | Lint the repository with zero warnings allowed.     |
-| `npm run format`           | Format the repository with Prettier.                |
-| `npm run migrate`          | Apply committed SQL migrations.                     |
-| `npm run migrate:generate` | Generate a migration from the Drizzle schema.       |
-| `npm run seed`             | Insert the demo accounts, links, and click history. |
-| `npm run db:up`            | Start PostgreSQL with Docker Compose.               |
-| `npm run db:down`          | Stop the compose stack.                             |
+| Command                    | Description                                             |
+| -------------------------- | ------------------------------------------------------- |
+| `npm run dev`              | Run the API and client together.                        |
+| `npm run build`            | Build the server and client for production.             |
+| `npm start`                | Start the compiled server (and serve the built client). |
+| `npm test`                 | Run all workspace test suites.                          |
+| `npm run typecheck`        | Type-check every workspace.                             |
+| `npm run lint`             | Lint the repository with zero warnings allowed.         |
+| `npm run format`           | Format the repository with Prettier.                    |
+| `npm run migrate`          | Apply committed SQL migrations.                         |
+| `npm run migrate:generate` | Generate a migration from the Drizzle schema.           |
+| `npm run seed`             | Insert the demo accounts, links, and click history.     |
+| `npm run db:up`            | Start PostgreSQL with Docker Compose.                   |
+| `npm run db:down`          | Stop the compose stack.                                 |
 
 ## API
 
@@ -580,8 +603,8 @@ The client is type-checked and built with `npm run typecheck --workspace=@snip/c
 - **Safer defaults**: secrets must be explicitly provided and have a minimum length; there are no
   insecure fallback secrets.
 - **Client and API share an origin**: the client uses relative `/api` URLs rather than a build-time
-  API host. In production, serve the built client and proxy `/api` to the API from the same origin;
-  this matches the `SameSite=Lax` auth cookie and avoids CORS/cookie complications.
+  API host, and the Express server serves the built client when `client/dist` exists. This matches the
+  `SameSite=Lax` auth cookie and avoids CORS/cookie complications.
 - **Server errors drive the client forms**: the UI maps `error.fields` back to inputs instead of
   duplicating server validation rules, so the server remains the source of truth.
 - **Analytics is code-split**: Recharts and the analytics screen are loaded only when that route is
@@ -604,14 +627,15 @@ The client is type-checked and built with `npm run typecheck --workspace=@snip/c
 - Per-link SVG QR codes with authenticated download.
 - Responsive React client with guarded routes, inline server validation errors, toasts, link
   management, analytics charts, and QR download.
+- Production delivery of the built client from Express, with hashed-asset caching, `no-cache` HTML,
+  an explicit SPA fallback, and a default Helmet CSP that permits QR blob images.
 - Unit and PostgreSQL-backed integration tests, deterministic demo seed data, and this README.
 
 ## What is not finished
 
 - Browser-level end-to-end tests (Playwright or similar) for the full register → create → redirect →
   analytics → QR flow.
-- A production deployment: reverse proxy, TLS, CSP tuned to the built client, secrets management,
-  backups, and a CI pipeline.
+- A production deployment: reverse proxy, TLS, secrets management, backups, and a CI pipeline.
 - Distributed infrastructure: the LRU cache, click queue, and rate-limit store are in-process and
   assume a single API instance.
 - DNS-aware SSRF protection. Private-host blocking currently checks literals and hostnames without
@@ -630,8 +654,8 @@ The client is type-checked and built with `npm run typecheck --workspace=@snip/c
    use a shared rate-limit store, and load-test the redirect path under concurrent traffic.
 3. Add observability: request and redirect latency histograms, cache hit ratio, queue depth, dropped
    click counts, database slow-query logging, and alerts for queue failures.
-4. Harden deployment with a same-origin reverse proxy, a strict CSP, managed secrets, automated
-   backups, and migration rollback procedures.
+4. Harden deployment with a same-origin reverse proxy, TLS, managed secrets, automated backups, and
+   migration rollback procedures.
 5. Add DNS-aware destination checks and outbound egress restrictions to close the remaining SSRF
    gap.
 6. Add email verification, password reset, account deletion, and token revocation for a complete
