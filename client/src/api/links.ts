@@ -45,9 +45,7 @@ export const linksApi = {
   },
 
   async analytics(id: string, range: AnalyticsRange): Promise<LinkAnalytics> {
-    return apiRequest<LinkAnalytics>(
-      `/links/${encodeURIComponent(id)}/analytics?range=${range}`,
-    );
+    return apiRequest<LinkAnalytics>(`/links/${encodeURIComponent(id)}/analytics?range=${range}`);
   },
 
   async qr(id: string): Promise<Blob> {
