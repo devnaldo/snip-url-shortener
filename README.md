@@ -383,6 +383,31 @@ npm test
 
 Server tests use Vitest and Supertest against the Express app without binding a port. The test
 suite supplies its own deterministic environment values and never touches the development database.
+
+The integration suite (`server/test/integration.test.ts`) runs against a dedicated PostgreSQL
+database, `snip_test`. The Vitest global setup creates that database if it does not exist and
+applies the committed Drizzle migrations before the first test; each test then truncates the tables
+so runs are isolated. Override the connection string when needed:
+
+```bash
+TEST_DATABASE_URL=postgresql://user:pass@localhost:5432/my_test_db npm test
+```
+
+For safety, the setup refuses to run when the database name does not end in `_test`, because the
+suite truncates tables. Start PostgreSQL first with `npm run db:up`.
+
+Covered end-to-end against the real database:
+
+- destination URL and custom alias validation (including reserved words, credentials, own-host, and
+  localhost/private addresses);
+- expiry and disabled links returning 410, and unknown aliases returning 404;
+- per-user creation rate limiting (429 with `Retry-After`);
+- ownership isolation across read, list, edit, delete, and analytics;
+- redirects returning 302 before the queued click is persisted (verified with a deliberately
+  blocked queue insert) and the click eventually landing with parsed UA/referrer fields;
+- redirect-cache invalidation after edit, disable/enable, and delete;
+- analytics aggregation, gap-filled daily buckets, half-open windows, and unique visitors.
+
 The client is type-checked and built with `npm run typecheck --workspace=@snip/client` and
 `npm run build --workspace=@snip/client`; browser-level end-to-end tests are listed under next steps.
 

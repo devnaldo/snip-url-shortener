@@ -1,14 +1,25 @@
 import { defineConfig } from 'vitest/config';
 
+// Integration tests run against a database that is separate from the
+// development database. Override with TEST_DATABASE_URL when needed.
+const TEST_DATABASE_URL =
+  process.env.TEST_DATABASE_URL ?? 'postgresql://snip:snip@localhost:5432/snip_test';
+
 export default defineConfig({
   test: {
     environment: 'node',
     include: ['test/**/*.test.ts'],
+    // The integration suite truncates and seeds a real PostgreSQL database, so
+    // test files must not run against it concurrently.
+    fileParallelism: false,
+    globalSetup: ['./test/global-setup.ts'],
+    testTimeout: 15_000,
+    hookTimeout: 30_000,
     // Deterministic, test-only configuration. Never used outside the test run.
     env: {
       NODE_ENV: 'test',
       PORT: '3001',
-      DATABASE_URL: 'postgresql://snip:snip@localhost:5432/snip_test',
+      DATABASE_URL: TEST_DATABASE_URL,
       JWT_SECRET: 'test-jwt-secret-that-is-at-least-32-characters-long',
       CLIENT_URL: 'http://localhost:5173',
       BASE_URL: 'http://localhost:3000',
