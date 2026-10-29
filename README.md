@@ -4,11 +4,12 @@ Snip is a full-stack URL shortener: create compact links, share them, and see ho
 Every click is recorded after the redirect is served, so analytics never slow down the redirect
 path. The project is built as an npm-workspaces monorepo with a React client and an Express API.
 
-> **Status:** authentication, link management, redirects, analytics, and QR codes complete. The API
-> supports registration, login, logout, session lookup, link creation with custom or generated
-> aliases, paginated listing with click totals, editing, deletion, cached redirects that record
-> clicks without blocking the response, per-link analytics, and downloadable SVG QR codes. The
-> client dashboard is next.
+> **Status:** authentication, link management, redirects, analytics, QR codes, and the React client
+> are complete. The API supports registration, login, logout, session lookup, link creation with
+> custom or generated aliases, paginated listing with click totals, editing, deletion, cached
+> redirects that record clicks without blocking the response, per-link analytics, and downloadable
+> SVG QR codes. The client provides guarded auth screens, a responsive link dashboard, analytics
+> charts, and QR download.
 
 ## Stack
 
@@ -16,7 +17,7 @@ path. The project is built as an npm-workspaces monorepo with a React client and
 | -------- | ---------------------------------------------------------------------------- |
 | Server   | Node.js 20+, Express 5, TypeScript (strict), Zod, pino                       |
 | Database | PostgreSQL 16, Drizzle ORM, SQL migrations committed to the repo             |
-| Client   | React 19, Vite, TypeScript, Tailwind CSS                                     |
+| Client   | React 19, React Router, Vite, TypeScript, Tailwind CSS, Recharts             |
 | Testing  | Vitest, Supertest                                                            |
 | Tooling  | npm workspaces, ESLint (type-aware), Prettier, Docker Compose for PostgreSQL |
 
@@ -26,7 +27,13 @@ path. The project is built as an npm-workspaces monorepo with a React client and
 .
 ├── client/                 # React + Vite frontend
 │   ├── public/             # Static assets
-│   └── src/                # Application source
+│   └── src/
+│       ├── api/            # Typed fetch client and response types
+│       ├── auth/           # Session provider, hooks, route guards
+│       ├── components/     # Layout, forms, modals, charts
+│       ├── lib/            # Dates, formatting, clipboard, styles
+│       ├── pages/          # Auth, dashboard, analytics screens
+│       └── toast/          # Accessible toast notifications
 ├── server/                 # Express API
 │   ├── drizzle/            # Generated SQL migrations (committed)
 │   ├── src/
@@ -279,9 +286,55 @@ are parsed with `ua-parser-js`; bot detection uses its bot-detection extension. 
 `CLICK_HASH_SECRET`. Raw IP addresses are never stored or logged. Because the salt rotates daily,
 unique-visitor counts reset at UTC midnight.
 
-### Planned
+## Client
 
-The client dashboard — link management, analytics charts, and QR download — is still to come.
+The React app in `client/` talks to the API through a small typed client (`client/src/api/`). It
+always calls relative `/api` paths with `credentials: 'include'`, so the auth cookie works through
+the Vite dev proxy and in a same-origin production deployment. Responses are typed, and failures
+are normalized into an `ApiError` carrying the server's `code`, `message`, and optional `fields`.
+Validation messages from the server are rendered next to the matching input.
+
+| Route                  | Access    | Screen                                                      |
+| ---------------------- | --------- | ----------------------------------------------------------- |
+| `/login`               | Guest     | Email/password sign-in                                      |
+| `/register`            | Guest     | Account creation                                            |
+| `/`                    | Protected | Create-link form and paginated link management              |
+| `/links/:id/analytics` | Protected | Range-scoped analytics, charts, and referrer/device/browser |
+
+Authentication and routing:
+
+- `AuthProvider` calls `GET /api/auth/me` on load and exposes loading, authenticated,
+  unauthenticated, and error states. A failed session lookup shows a retry screen instead of
+  silently signing the user out.
+- `RequireAuth` redirects unauthenticated visitors to `/login` and remembers the attempted path;
+  `GuestRoute` sends authenticated users back to the dashboard. Any `401` from the API clears the
+  session so an expired cookie cannot leave the UI in a stale state.
+- The session error is distinct from an API failure: network/server failures offer a retry, while
+  an actual `401` is treated as signed out.
+
+Dashboard:
+
+- Create a link with a destination, optional custom alias, and optional expiry. Server field
+  errors appear inline, while rate-limit and other request failures also surface as toasts.
+- Links render as cards below `md` and as a table from `md` upward. Each row supports copy,
+  enable/disable (switch), edit, delete with confirmation, QR display, and analytics.
+- Deleting the last item on a page moves back one page; the list refreshes after mutations so
+  pagination totals stay accurate.
+
+Analytics and QR:
+
+- The range selector switches between `7d`, `30d`, and `90d` without a full page reload. Totals,
+  the gap-filled line chart, top referrers, device donut, and browser bars all come from the
+  server-side aggregation endpoint.
+- The analytics route is lazy-loaded, so Recharts is not part of the initial dashboard bundle.
+- QR codes are fetched from the authenticated endpoint as a blob, displayed as an SVG, and
+  downloaded as `snip-<alias>.svg` without exposing the cookie to a third party.
+
+The layout is mobile-first and designed from a 360px viewport upward: stacked forms, card lists,
+wrapping action buttons, full-width range controls, scrollable tables on medium screens, and
+bottom-sheet modals on phones. Modals trap focus, close on Escape or backdrop click, and restore
+focus to the trigger. Inputs use explicit labels, `aria-invalid`, and linked error text; toasts use
+a live region; toggle switches expose `role="switch"`.
 
 ## Architecture
 
@@ -330,6 +383,8 @@ npm test
 
 Server tests use Vitest and Supertest against the Express app without binding a port. The test
 suite supplies its own deterministic environment values and never touches the development database.
+The client is type-checked and built with `npm run typecheck --workspace=@snip/client` and
+`npm run build --workspace=@snip/client`; browser-level end-to-end tests are listed under next steps.
 
 ## Security
 
@@ -374,9 +429,20 @@ suite supplies its own deterministic environment values and never touches the de
 - **Demo seed data is safe**: only for local development; credentials are documented and non-secret.
 - **Safer defaults**: secrets must be explicitly provided and have a minimum length; there are no
   insecure fallback secrets.
+- **Client and API share an origin**: the client uses relative `/api` URLs rather than a build-time
+  API host. In production, serve the built client and proxy `/api` to the API from the same origin;
+  this matches the `SameSite=Lax` auth cookie and avoids CORS/cookie complications.
+- **Server errors drive the client forms**: the UI maps `error.fields` back to inputs instead of
+  duplicating server validation rules, so the server remains the source of truth.
+- **Analytics is code-split**: Recharts and the analytics screen are loaded only when that route is
+  visited, keeping the initial dashboard bundle smaller.
+- **QR images are authenticated blobs**: the SVG is fetched with the session cookie and rendered
+  from an object URL, then revoked on close. No QR service sees the short URL or the cookie.
 
 ## Next steps
 
-1. Client authentication and link-management screens.
-2. Analytics dashboard with charts for clicks over time, referrers, and device/browser splits.
-3. QR code display and download in the client.
+1. Add browser-level end-to-end tests for register, login, link CRUD, QR download, and analytics.
+2. Add deployment hardening: a reverse proxy that serves the client and proxies `/api`, a
+   production rate-limit store, and CSP tuned to the deployed assets.
+3. Revisit private-host blocking with DNS resolution if deployments allow user-supplied
+   destinations that could target internal services.
