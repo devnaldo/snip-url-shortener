@@ -22,11 +22,14 @@ export function LinkCard({
   onShowQr,
 }: LinkCardProps) {
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
+    <article className="rounded-lg border border-line bg-surface">
+      <div className="flex items-start justify-between gap-3 px-4 pt-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="break-all text-sm font-semibold text-slate-900" title={link.alias}>
+            <h3
+              className="min-w-0 truncate font-mono text-[0.8125rem] font-semibold text-ink"
+              title={link.alias}
+            >
               {link.alias}
             </h3>
             <LinkStatusBadge link={link} />
@@ -35,7 +38,7 @@ export function LinkCard({
             href={link.shortUrl}
             target="_blank"
             rel="noreferrer"
-            className="mt-1 block truncate text-sm font-medium text-indigo-600 hover:text-indigo-700 hover:underline"
+            className="mt-1.5 block truncate font-mono text-[0.6875rem] text-accent hover:underline"
           >
             {link.shortUrl}
           </a>
@@ -48,33 +51,40 @@ export function LinkCard({
         />
       </div>
 
-      <dl className="mt-4 space-y-3 border-t border-slate-100 pt-3 text-sm">
+      <dl className="mt-3 space-y-3 border-t border-line px-4 py-3">
         <div>
-          <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
-            Destination
-          </dt>
-          <dd className="mt-0.5 break-all text-slate-700">{link.destinationUrl}</dd>
+          <dt className="eyebrow">Destination</dt>
+          <dd className="mt-1 break-all text-[0.75rem] leading-relaxed text-muted">
+            {link.destinationUrl}
+          </dd>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Clicks</dt>
-            <dd className="mt-0.5 font-medium text-slate-900">{link.clickCount}</dd>
+            <dt className="eyebrow">Clicks</dt>
+            <dd className="mt-1 font-terminal text-xl leading-none text-ink">{link.clickCount}</dd>
           </div>
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Created</dt>
-            <dd className="mt-0.5 text-slate-700">{formatDate(link.createdAt)}</dd>
+            <dt className="eyebrow">Created</dt>
+            <dd className="mt-1 text-[0.75rem] text-muted">{formatDate(link.createdAt)}</dd>
           </div>
           <div className="col-span-2">
-            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Expires</dt>
-            <dd className="mt-0.5 text-slate-700">
+            <dt className="eyebrow">Expires</dt>
+            <dd className="mt-1 text-[0.75rem] text-muted">
               {link.expiresAt ? formatDateTime(link.expiresAt) : 'Never'}
             </dd>
           </div>
         </div>
       </dl>
 
-      <div className="mt-4 border-t border-slate-100 pt-3">
-        <LinkActions link={link} onEdit={onEdit} onDelete={onDelete} onShowQr={onShowQr} />
+      <div className="border-t border-line px-2 py-1.5">
+        <LinkActions
+          compact
+          spread
+          link={link}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onShowQr={onShowQr}
+        />
       </div>
     </article>
   );

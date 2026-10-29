@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { errorMessage } from '../api/client';
 import { linksApi } from '../api/links';
 import type { LinkDto, LinkListItem, Pagination as PaginationState } from '../api/types';
-import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Button } from '../components/Button';
+import { ConfirmDialog } from '../components/ConfirmDialog';
+import { RefreshIcon } from '../components/Icons';
 import { Pagination } from '../components/Pagination';
 import { EmptyState, ErrorState } from '../components/States';
 import { CreateLinkForm } from '../components/links/CreateLinkForm';
@@ -121,46 +122,78 @@ export function DashboardPage() {
 
   return (
     <div>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-            Your links
-          </h1>
-          <p className="mt-1 text-sm text-slate-600">
-            {status === 'ready'
-              ? `${pagination.total} ${pagination.total === 1 ? 'link' : 'links'} · clicks tracked automatically.`
-              : 'Create, share, and measure your short links.'}
-          </p>
-        </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          className="shrink-0"
-          onClick={refresh}
-          isLoading={status === 'loading'}
-        >
-          Refresh
-        </Button>
-      </div>
+      <header className="border-b border-line pb-6">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="min-w-0">
+            <p className="eyebrow">Workspace / Links</p>
+            <h1 className="mt-3 font-display text-[1.75rem] leading-none tracking-tight text-ink sm:text-[2.25rem]">
+              Your links
+            </h1>
+            <p className="mt-3 max-w-lg text-xs leading-relaxed text-muted">
+              Create, share, and measure short links. Every redirect is served from cache before the
+              click is recorded.
+            </p>
+          </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] xl:items-start">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="shrink-0"
+            onClick={refresh}
+            isLoading={status === 'loading'}
+          >
+            <RefreshIcon className="h-3.5 w-3.5" />
+            Refresh
+          </Button>
+        </div>
+
+        <dl className="mt-6 flex flex-wrap items-baseline gap-x-7 gap-y-2">
+          <div className="flex items-baseline gap-2">
+            <dt className="eyebrow">Total</dt>
+            <dd className="font-terminal text-lg leading-none text-ink">{pagination.total}</dd>
+          </div>
+          {pagination.totalPages > 1 ? (
+            <div className="flex items-baseline gap-2">
+              <dt className="eyebrow">Page</dt>
+              <dd className="font-terminal text-lg leading-none text-ink">
+                {pagination.page} / {pagination.totalPages}
+              </dd>
+            </div>
+          ) : null}
+          <div className="flex items-baseline gap-2">
+            <dt className="eyebrow">Tracking</dt>
+            <dd className="font-mono text-[0.625rem] uppercase tracking-[0.1em] text-muted">
+              Async · batched
+            </dd>
+          </div>
+        </dl>
+      </header>
+
+      <div className="mt-8 grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] xl:items-start xl:gap-8">
         <CreateLinkForm onCreated={handleCreated} />
 
         <section className="min-w-0 space-y-4" aria-labelledby="links-heading">
-          <h2 id="links-heading" className="sr-only">
-            All links
-          </h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 id="links-heading" className="eyebrow">
+              All links
+            </h2>
+            {status === 'ready' && links.length > 0 ? (
+              <p className="font-mono text-[0.625rem] uppercase tracking-[0.1em] text-subtle">
+                {links.length} on this page
+              </p>
+            ) : null}
+          </div>
 
           {isInitialLoading ? (
             <div className="space-y-3" role="status" aria-label="Loading links">
               {[0, 1, 2].map((key) => (
                 <div
                   key={key}
-                  className="animate-pulse rounded-xl border border-slate-200 bg-white p-4"
+                  className="animate-skeleton rounded-lg border border-line bg-surface p-4"
                 >
-                  <div className="h-4 w-1/3 rounded bg-slate-200" />
-                  <div className="mt-3 h-3 w-2/3 rounded bg-slate-100" />
-                  <div className="mt-4 h-8 w-1/2 rounded bg-slate-100" />
+                  <div className="h-3.5 w-1/3 bg-surface-2" />
+                  <div className="mt-3 h-2.5 w-2/3 bg-surface-2" />
+                  <div className="mt-4 h-7 w-1/2 bg-surface-2" />
                 </div>
               ))}
             </div>
@@ -177,7 +210,7 @@ export function DashboardPage() {
             />
           ) : (
             <>
-              <div className="space-y-3 md:hidden">
+              <div className="grid grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-2 lg:hidden">
                 {links.map((link) => (
                   <LinkCard
                     key={link.id}

@@ -3,11 +3,13 @@ import type { FormEvent } from 'react';
 import { errorMessage, fieldErrors } from '../../api/client';
 import { linksApi } from '../../api/links';
 import type { LinkDto } from '../../api/types';
+import { fieldDescribedBy } from '../../lib/a11y';
 import { fromDateTimeLocalValue, toDateTimeLocalValue } from '../../lib/format';
 import { inputClassName } from '../../lib/styles';
 import { useToast } from '../../toast/useToast';
 import { Button } from '../Button';
 import { Field } from '../Field';
+import { AlertIcon } from '../Icons';
 import { Modal } from '../Modal';
 
 interface EditLinkModalProps {
@@ -84,9 +86,10 @@ export function EditLinkModal({ link, onClose, onSaved }: EditLinkModalProps) {
         {formError ? (
           <div
             role="alert"
-            className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+            className="flex items-start gap-2 rounded-md border border-danger/40 bg-danger-soft px-3 py-2 text-[0.6875rem] leading-relaxed text-danger"
           >
-            {formError}
+            <AlertIcon className="mt-px h-3.5 w-3.5 shrink-0" />
+            <span>{formError}</span>
           </div>
         ) : null}
 
@@ -102,7 +105,9 @@ export function EditLinkModal({ link, onClose, onSaved }: EditLinkModalProps) {
               clearFieldError('destinationUrl');
             }}
             aria-invalid={errors.destinationUrl ? true : undefined}
-            aria-describedby={errors.destinationUrl ? 'edit-destinationUrl-error' : undefined}
+            aria-describedby={fieldDescribedBy('edit-destinationUrl', {
+              error: Boolean(errors.destinationUrl),
+            })}
             className={inputClassName(Boolean(errors.destinationUrl))}
             autoComplete="off"
             required
@@ -127,13 +132,16 @@ export function EditLinkModal({ link, onClose, onSaved }: EditLinkModalProps) {
                 clearFieldError('expiresAt');
               }}
               aria-invalid={errors.expiresAt ? true : undefined}
-              aria-describedby={errors.expiresAt ? 'edit-expiresAt-error' : undefined}
+              aria-describedby={fieldDescribedBy('edit-expiresAt', {
+                hint: true,
+                error: Boolean(errors.expiresAt),
+              })}
               className={inputClassName(Boolean(errors.expiresAt))}
             />
             {expiresAt ? (
               <button
                 type="button"
-                className="text-xs font-medium text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
+                className="font-mono text-[0.6875rem] uppercase tracking-[0.08em] text-muted underline-offset-4 transition-colors hover:text-ink hover:underline"
                 onClick={() => {
                   setExpiresAt('');
                   clearFieldError('expiresAt');

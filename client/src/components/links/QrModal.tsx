@@ -4,6 +4,7 @@ import { linksApi } from '../../api/links';
 import type { LinkDto } from '../../api/types';
 import { buttonClassName } from '../../lib/styles';
 import { Button } from '../Button';
+import { DownloadIcon } from '../Icons';
 import { Modal } from '../Modal';
 import { Spinner } from '../Spinner';
 
@@ -70,38 +71,41 @@ export function QrModal({ link, onClose }: QrModalProps) {
           </Button>
           {status === 'ready' && imageUrl ? (
             <a href={imageUrl} download={filename} className={buttonClassName('primary', 'sm')}>
+              <DownloadIcon className="h-3.5 w-3.5" />
               Download SVG
             </a>
           ) : null}
         </>
       }
     >
-      <div className="flex min-h-[248px] flex-col items-center justify-center gap-3">
+      <div className="flex min-h-[248px] flex-col items-center justify-center gap-4">
         {status === 'loading' ? (
-          <>
-            <Spinner className="h-7 w-7 text-indigo-600" />
-            <p className="text-sm text-slate-600" role="status">
-              Generating QR code…
-            </p>
-          </>
+          <div className="flex flex-col items-center gap-3" role="status">
+            <Spinner className="h-4 w-4 text-accent" />
+            <p className="eyebrow">Generating QR code</p>
+          </div>
         ) : status === 'error' ? (
           <div role="alert" className="text-center">
-            <p className="text-sm font-medium text-slate-900">Could not generate the QR code</p>
-            <p className="mt-1 text-sm text-slate-600">{error}</p>
-            <Button variant="secondary" size="sm" className="mt-4" onClick={retry}>
+            <p className="font-display text-[0.75rem] uppercase tracking-[0.06em] text-ink">
+              Could not generate the QR code
+            </p>
+            <p className="mt-2 text-xs leading-relaxed text-muted">{error}</p>
+            <Button variant="secondary" size="sm" className="mt-5" onClick={retry}>
               Try again
             </Button>
           </div>
         ) : imageUrl ? (
           <>
-            <div className="w-full max-w-[260px] rounded-xl border border-slate-200 bg-white p-3">
+            <div className="w-full max-w-[240px] rounded-md border border-line bg-white p-3">
               <img
                 src={imageUrl}
                 alt={`QR code for ${link.shortUrl}`}
                 className="mx-auto block h-auto w-full"
               />
             </div>
-            <p className="break-all text-center text-xs text-slate-500">{link.shortUrl}</p>
+            <p className="break-all text-center font-mono text-[0.6875rem] text-subtle">
+              {link.shortUrl}
+            </p>
           </>
         ) : null}
       </div>

@@ -3,11 +3,13 @@ import type { FormEvent } from 'react';
 import { errorMessage, fieldErrors } from '../../api/client';
 import { linksApi } from '../../api/links';
 import type { CreateLinkInput, LinkDto } from '../../api/types';
+import { fieldDescribedBy } from '../../lib/a11y';
 import { fromDateTimeLocalValue, toDateTimeLocalValue } from '../../lib/format';
 import { inputClassName } from '../../lib/styles';
 import { useToast } from '../../toast/useToast';
 import { Button } from '../Button';
 import { Field } from '../Field';
+import { AlertIcon, PlusIcon } from '../Icons';
 
 interface CreateLinkFormProps {
   onCreated: (link: LinkDto) => void;
@@ -76,99 +78,124 @@ export function CreateLinkForm({ onCreated }: CreateLinkFormProps) {
   return (
     <section
       id="create-link"
-      className="mx-auto w-full max-w-2xl rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 xl:sticky xl:top-20 xl:mx-0 xl:max-w-none"
+      aria-labelledby="create-link-heading"
+      className="mx-auto w-full max-w-2xl rounded-lg border border-line bg-surface xl:sticky xl:top-20 xl:mx-0 xl:max-w-none"
     >
-      <h2 className="text-base font-semibold text-slate-900">Create a link</h2>
-      <p className="mt-1 text-sm text-slate-600">
-        Paste a destination and optionally choose your own alias and expiry.
-      </p>
-
-      <form className="mt-4 space-y-4" onSubmit={(event) => void handleSubmit(event)} noValidate>
-        {formError ? (
-          <div
-            role="alert"
-            className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
-          >
-            {formError}
-          </div>
-        ) : null}
-
-        <Field
-          id="destinationUrl"
-          label="Destination URL"
-          error={errors.destinationUrl}
-          hint="Only http:// and https:// links are allowed."
+      <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
+        <h2
+          id="create-link-heading"
+          className="font-display text-[0.75rem] uppercase tracking-[0.06em] text-ink"
         >
-          <input
+          New link
+        </h2>
+        <span aria-hidden="true" className="font-terminal text-sm leading-none text-subtle">
+          01
+        </span>
+      </div>
+
+      <div className="p-4 sm:p-5">
+        <p className="text-[0.6875rem] leading-relaxed text-muted">
+          Paste a destination. Alias and expiry are optional.
+        </p>
+
+        <form className="mt-4 space-y-4" onSubmit={(event) => void handleSubmit(event)} noValidate>
+          {formError ? (
+            <div
+              role="alert"
+              className="flex items-start gap-2 rounded-md border border-danger/40 bg-danger-soft px-3 py-2 text-[0.6875rem] leading-relaxed text-danger"
+            >
+              <AlertIcon className="mt-px h-3.5 w-3.5 shrink-0" />
+              <span>{formError}</span>
+            </div>
+          ) : null}
+
+          <Field
             id="destinationUrl"
-            name="destinationUrl"
-            type="text"
-            inputMode="url"
-            value={destinationUrl}
-            onChange={(event) => {
-              setDestinationUrl(event.target.value);
-              clearFieldError('destinationUrl');
-            }}
-            aria-invalid={errors.destinationUrl ? true : undefined}
-            aria-describedby={errors.destinationUrl ? 'destinationUrl-error' : undefined}
-            className={inputClassName(Boolean(errors.destinationUrl))}
-            placeholder="https://example.com/very/long/url"
-            autoComplete="off"
-            required
-          />
-        </Field>
+            label="Destination URL"
+            error={errors.destinationUrl}
+            hint="Only http:// and https:// links are allowed."
+          >
+            <input
+              id="destinationUrl"
+              name="destinationUrl"
+              type="text"
+              inputMode="url"
+              value={destinationUrl}
+              onChange={(event) => {
+                setDestinationUrl(event.target.value);
+                clearFieldError('destinationUrl');
+              }}
+              aria-invalid={errors.destinationUrl ? true : undefined}
+              aria-describedby={fieldDescribedBy('destinationUrl', {
+                hint: true,
+                error: Boolean(errors.destinationUrl),
+              })}
+              className={inputClassName(Boolean(errors.destinationUrl))}
+              placeholder="https://example.com/very/long/url"
+              autoComplete="off"
+              required
+            />
+          </Field>
 
-        <Field
-          id="alias"
-          label="Custom alias"
-          error={errors.alias}
-          optional
-          hint="3–32 letters, numbers, hyphens, or underscores."
-        >
-          <input
+          <Field
             id="alias"
-            name="alias"
-            type="text"
-            value={alias}
-            onChange={(event) => {
-              setAlias(event.target.value);
-              clearFieldError('alias');
-            }}
-            aria-invalid={errors.alias ? true : undefined}
-            aria-describedby={errors.alias ? 'alias-error' : undefined}
-            className={inputClassName(Boolean(errors.alias))}
-            placeholder="launch-2026"
-            autoComplete="off"
-          />
-        </Field>
+            label="Custom alias"
+            error={errors.alias}
+            optional
+            hint="3–32 letters, numbers, hyphens, or underscores."
+          >
+            <input
+              id="alias"
+              name="alias"
+              type="text"
+              value={alias}
+              onChange={(event) => {
+                setAlias(event.target.value);
+                clearFieldError('alias');
+              }}
+              aria-invalid={errors.alias ? true : undefined}
+              aria-describedby={fieldDescribedBy('alias', {
+                hint: true,
+                error: Boolean(errors.alias),
+              })}
+              className={inputClassName(Boolean(errors.alias))}
+              placeholder="launch-2026"
+              autoComplete="off"
+            />
+          </Field>
 
-        <Field
-          id="expiresAt"
-          label="Expires"
-          error={errors.expiresAt}
-          optional
-          hint="Leave empty for a link that never expires."
-        >
-          <input
+          <Field
             id="expiresAt"
-            name="expiresAt"
-            type="datetime-local"
-            value={expiresAt}
-            min={toDateTimeLocalValue(new Date().toISOString())}
-            onChange={(event) => {
-              setExpiresAt(event.target.value);
-              clearFieldError('expiresAt');
-            }}
-            aria-invalid={errors.expiresAt ? true : undefined}
-            aria-describedby={errors.expiresAt ? 'expiresAt-error' : undefined}
-            className={inputClassName(Boolean(errors.expiresAt))}
-          />
-        </Field>
+            label="Expires"
+            error={errors.expiresAt}
+            optional
+            hint="Leave empty for a link that never expires."
+          >
+            <input
+              id="expiresAt"
+              name="expiresAt"
+              type="datetime-local"
+              value={expiresAt}
+              min={toDateTimeLocalValue(new Date().toISOString())}
+              onChange={(event) => {
+                setExpiresAt(event.target.value);
+                clearFieldError('expiresAt');
+              }}
+              aria-invalid={errors.expiresAt ? true : undefined}
+              aria-describedby={fieldDescribedBy('expiresAt', {
+                hint: true,
+                error: Boolean(errors.expiresAt),
+              })}
+              className={inputClassName(Boolean(errors.expiresAt))}
+            />
+          </Field>
 
-        <Button type="submit" className="w-full" isLoading={isSubmitting}>
-          Create short link
-        </Button>
-      </form>
+          <Button type="submit" className="w-full" isLoading={isSubmitting}>
+            <PlusIcon className="h-3.5 w-3.5" />
+            Create short link
+          </Button>
+        </form>
+      </div>
     </section>
   );
 }
