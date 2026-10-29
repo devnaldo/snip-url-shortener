@@ -10,9 +10,17 @@ interface LinkTableProps {
   onToggle: (link: LinkListItem) => void;
   onEdit: (link: LinkListItem) => void;
   onDelete: (link: LinkListItem) => void;
+  onShowQr: (link: LinkListItem) => void;
 }
 
-export function LinkTable({ links, togglingId, onToggle, onEdit, onDelete }: LinkTableProps) {
+export function LinkTable({
+  links,
+  togglingId,
+  onToggle,
+  onEdit,
+  onDelete,
+  onShowQr,
+}: LinkTableProps) {
   return (
     <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm md:block">
       <div className="overflow-x-auto">
@@ -87,6 +95,7 @@ export function LinkTable({ links, togglingId, onToggle, onEdit, onDelete }: Lin
                       link={link}
                       onEdit={() => onEdit(link)}
                       onDelete={() => onDelete(link)}
+                      onShowQr={() => onShowQr(link)}
                     />
                   </div>
                 </td>

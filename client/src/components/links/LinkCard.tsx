@@ -10,9 +10,17 @@ interface LinkCardProps {
   onToggle: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onShowQr: () => void;
 }
 
-export function LinkCard({ link, isToggling, onToggle, onEdit, onDelete }: LinkCardProps) {
+export function LinkCard({
+  link,
+  isToggling,
+  onToggle,
+  onEdit,
+  onDelete,
+  onShowQr,
+}: LinkCardProps) {
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
@@ -64,7 +72,7 @@ export function LinkCard({ link, isToggling, onToggle, onEdit, onDelete }: LinkC
       </dl>
 
       <div className="mt-4 border-t border-slate-100 pt-3">
-        <LinkActions link={link} onEdit={onEdit} onDelete={onDelete} />
+        <LinkActions link={link} onEdit={onEdit} onDelete={onDelete} onShowQr={onShowQr} />
       </div>
     </article>
   );

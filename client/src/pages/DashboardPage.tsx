@@ -10,6 +10,7 @@ import { CreateLinkForm } from '../components/links/CreateLinkForm';
 import { EditLinkModal } from '../components/links/EditLinkModal';
 import { LinkCard } from '../components/links/LinkCard';
 import { LinkTable } from '../components/links/LinkTable';
+import { QrModal } from '../components/links/QrModal';
 import { applyLinkUpdate } from '../lib/link-state';
 import { useToast } from '../toast/useToast';
 
@@ -28,6 +29,7 @@ export function DashboardPage() {
 
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [editingLink, setEditingLink] = useState<LinkListItem | null>(null);
+  const [qrLink, setQrLink] = useState<LinkListItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<LinkListItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -183,6 +185,7 @@ export function DashboardPage() {
                     onToggle={() => void handleToggle(link)}
                     onEdit={() => setEditingLink(link)}
                     onDelete={() => setDeleteTarget(link)}
+                    onShowQr={() => setQrLink(link)}
                   />
                 ))}
               </div>
@@ -193,6 +196,7 @@ export function DashboardPage() {
                 onToggle={(link) => void handleToggle(link)}
                 onEdit={setEditingLink}
                 onDelete={setDeleteTarget}
+                onShowQr={setQrLink}
               />
 
               <Pagination
@@ -214,6 +218,8 @@ export function DashboardPage() {
           onSaved={handleSaved}
         />
       ) : null}
+
+      {qrLink ? <QrModal key={qrLink.id} link={qrLink} onClose={() => setQrLink(null)} /> : null}
 
       <ConfirmDialog
         open={deleteTarget !== null}

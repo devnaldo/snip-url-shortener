@@ -9,9 +9,10 @@ interface LinkActionsProps {
   link: LinkListItem;
   onEdit: () => void;
   onDelete: () => void;
+  onShowQr: () => void;
 }
 
-export function LinkActions({ link, onEdit, onDelete }: LinkActionsProps) {
+export function LinkActions({ link, onEdit, onDelete, onShowQr }: LinkActionsProps) {
   const { showToast } = useToast();
 
   async function handleCopy() {
@@ -27,6 +28,9 @@ export function LinkActions({ link, onEdit, onDelete }: LinkActionsProps) {
       <Link to={`/links/${link.id}/analytics`} className={buttonClassName('secondary', 'sm')}>
         Analytics
       </Link>
+      <Button variant="secondary" size="sm" onClick={onShowQr}>
+        QR
+      </Button>
       <Button variant="secondary" size="sm" onClick={() => void handleCopy()}>
         Copy
       </Button>
