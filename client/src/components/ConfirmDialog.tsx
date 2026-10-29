@@ -38,7 +38,7 @@ export function ConfirmDialog({
         </>
       }
     >
-      <p className="text-sm text-slate-600">
+      <p className="text-xs leading-relaxed text-muted">
         This action cannot be undone. The short link and all of its recorded clicks will be removed.
       </p>
     </Modal>

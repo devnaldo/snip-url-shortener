@@ -1,28 +1,39 @@
 import { cn } from '../lib/styles';
+import { LogoMark } from './Logo';
 
 interface SpinnerProps {
   className?: string;
 }
 
+/** Pixel loading indicator: four blocks cycling in a two-by-two grid. */
 export function Spinner({ className }: SpinnerProps) {
   return (
-    <svg
-      className={cn('h-5 w-5 animate-spin', className)}
-      viewBox="0 0 24 24"
-      fill="none"
+    <span
       aria-hidden="true"
+      className={cn(
+        'inline-grid h-4 w-4 shrink-0 grid-cols-2 grid-rows-2 gap-[2px] text-current',
+        className,
+      )}
     >
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4Z" />
-    </svg>
+      {[0, 1, 2, 3].map((index) => (
+        <span
+          key={index}
+          className="block animate-block-blink bg-current"
+          style={{ animationDelay: `${index * 150}ms` }}
+        />
+      ))}
+    </span>
   );
 }
 
 export function FullPageLoader({ label }: { label: string }) {
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-slate-50 px-4">
-      <Spinner className="h-7 w-7 text-indigo-600" />
-      <p className="text-sm text-slate-600">{label}</p>
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-canvas px-4">
+      <LogoMark className="h-9 w-9" />
+      <div className="flex items-center gap-2.5" role="status">
+        <Spinner className="h-3 w-3 text-accent" />
+        <p className="eyebrow">{label}</p>
+      </div>
     </div>
   );
 }

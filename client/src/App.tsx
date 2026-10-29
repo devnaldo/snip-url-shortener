@@ -45,11 +45,13 @@ function App() {
             <Suspense
               fallback={
                 <div
-                  className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-6 text-sm text-slate-600"
+                  className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-6"
                   role="status"
                 >
-                  <Spinner className="h-5 w-5 text-indigo-600" />
-                  Loading analytics…
+                  <Spinner className="h-3.5 w-3.5 text-accent" />
+                  <p className="font-mono text-[0.6875rem] uppercase tracking-[0.1em] text-muted">
+                    Loading analytics
+                  </p>
                 </div>
               }
             >

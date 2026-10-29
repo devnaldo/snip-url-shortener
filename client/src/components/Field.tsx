@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { AlertIcon } from './Icons';
 
 interface FieldProps {
   id: string;
@@ -12,17 +13,34 @@ interface FieldProps {
 export function Field({ id, label, error, hint, optional = false, children }: FieldProps) {
   return (
     <div className="space-y-1.5">
-      <div className="flex items-baseline justify-between gap-2">
-        <label htmlFor={id} className="text-sm font-medium text-slate-700">
-          {label}
-          {optional ? <span className="ml-1 font-normal text-slate-400">(optional)</span> : null}
-        </label>
-      </div>
+      <label
+        htmlFor={id}
+        className="flex items-baseline gap-2 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.1em] text-muted"
+      >
+        <span>{label}</span>
+        {optional ? (
+          <span className="text-[0.625rem] font-normal normal-case tracking-normal text-subtle">
+            optional
+          </span>
+        ) : null}
+      </label>
+
       {children}
-      {hint && !error ? <p className="text-xs text-slate-500">{hint}</p> : null}
+
+      {hint && !error ? (
+        <p id={`${id}-hint`} className="text-[0.6875rem] leading-relaxed text-subtle">
+          {hint}
+        </p>
+      ) : null}
+
       {error ? (
-        <p id={`${id}-error`} role="alert" className="text-xs font-medium text-rose-600">
-          {error}
+        <p
+          id={`${id}-error`}
+          role="alert"
+          className="flex items-start gap-1.5 text-[0.6875rem] leading-relaxed text-danger"
+        >
+          <AlertIcon className="mt-[2px] h-3 w-3 shrink-0" />
+          <span>{error}</span>
         </p>
       ) : null}
     </div>

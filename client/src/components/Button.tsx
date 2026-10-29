@@ -23,11 +23,11 @@ export function Button({
     <button
       type={type}
       className={cn(buttonClassName(variant, size), className)}
-      disabled={disabled ?? isLoading}
+      disabled={disabled === true || isLoading}
       aria-busy={isLoading || undefined}
       {...props}
     >
-      {isLoading ? <Spinner className="h-4 w-4" /> : null}
+      {isLoading ? <Spinner className="h-3 w-3" /> : null}
       {children}
     </button>
   );

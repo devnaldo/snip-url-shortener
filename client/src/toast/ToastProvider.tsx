@@ -3,13 +3,26 @@ import type { ReactNode } from 'react';
 import { cn } from '../lib/styles';
 import { ToastContext } from './toast-context';
 import type { ShowToast, ToastItem, ToastVariant } from './toast-context';
+import { AlertIcon, CheckIcon, CloseIcon, LinkIcon } from '../components/Icons';
 
 const TOAST_DURATION_MS = 4_500;
 
 const VARIANT_STYLES: Record<ToastVariant, string> = {
-  success: 'border-emerald-200 bg-emerald-50 text-emerald-900',
-  error: 'border-rose-200 bg-rose-50 text-rose-900',
-  info: 'border-slate-200 bg-white text-slate-900',
+  success: 'border-l-success',
+  error: 'border-l-danger',
+  info: 'border-l-accent',
+};
+
+const VARIANT_ICON_STYLES: Record<ToastVariant, string> = {
+  success: 'text-success',
+  error: 'text-danger',
+  info: 'text-accent',
+};
+
+const VARIANT_ICONS: Record<ToastVariant, ReactNode> = {
+  success: <CheckIcon className="h-3.5 w-3.5" />,
+  error: <AlertIcon className="h-3.5 w-3.5" />,
+  info: <LinkIcon className="h-3.5 w-3.5" />,
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -55,7 +68,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={value}>
       {children}
       <div
-        className="pointer-events-none fixed inset-x-3 bottom-3 z-40 flex flex-col gap-2 sm:inset-x-auto sm:right-4 sm:bottom-4 sm:w-80"
+        className="pointer-events-none fixed inset-x-3 bottom-3 z-40 flex flex-col gap-2 sm:inset-x-auto sm:right-4 sm:bottom-4 sm:w-[21rem]"
         aria-live="polite"
       >
         {toasts.map((toast) => (
@@ -63,20 +76,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             key={toast.id}
             role={toast.variant === 'error' ? 'alert' : 'status'}
             className={cn(
-              'pointer-events-auto flex items-start gap-3 rounded-xl border px-4 py-3 text-sm shadow-lg',
+              'pointer-events-auto flex animate-toast-in items-start gap-3 rounded-md border border-l-2 border-line bg-surface px-3.5 py-3 text-xs text-ink shadow-overlay',
               VARIANT_STYLES[toast.variant],
             )}
           >
-            <p className="min-w-0 flex-1 break-words">{toast.message}</p>
+            <span className={cn('mt-px shrink-0', VARIANT_ICON_STYLES[toast.variant])}>
+              {VARIANT_ICONS[toast.variant]}
+            </span>
+            <p className="min-w-0 flex-1 break-words leading-relaxed">{toast.message}</p>
             <button
               type="button"
               onClick={() => dismiss(toast.id)}
-              className="shrink-0 rounded p-0.5 opacity-60 transition hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+              className="-mr-1 -mt-1 shrink-0 rounded-sm p-1 text-subtle transition-colors duration-150 hover:bg-surface-2 hover:text-ink"
               aria-label="Dismiss notification"
             >
-              <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4" aria-hidden="true">
-                <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
-              </svg>
+              <CloseIcon className="h-3.5 w-3.5" />
             </button>
           </div>
         ))}

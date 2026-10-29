@@ -14,12 +14,11 @@ export function Pagination({ page, totalPages, onChange, disabled = false }: Pag
 
   return (
     <nav
-      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3"
+      className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4"
       aria-label="Pagination"
     >
-      <p className="text-sm text-slate-600">
-        Page <span className="font-medium text-slate-900">{page}</span> of{' '}
-        <span className="font-medium text-slate-900">{totalPages}</span>
+      <p className="font-mono text-[0.6875rem] uppercase tracking-[0.1em] text-subtle">
+        Page <span className="text-ink">{page}</span> / {totalPages}
       </p>
       <div className="flex gap-2">
         <Button
