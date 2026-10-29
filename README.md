@@ -370,9 +370,9 @@ Analytics and QR:
 - QR codes are fetched from the authenticated endpoint as a blob, displayed as an SVG, and
   downloaded as `snip-<alias>.svg` without exposing the cookie to a third party.
 
-The layout is mobile-first and designed from a 360px viewport upward: stacked forms, card lists,
-wrapping action buttons, full-width range controls, scrollable tables on medium screens, and
-bottom-sheet modals on phones. Modals trap focus, close on Escape or backdrop click, and restore
+The layout is mobile-first and designed from a 360px viewport upward: stacked forms, a card list
+below `lg` instead of a table, wrapping action buttons, full-width range controls, and bottom-sheet
+modals on phones. Modals trap focus, close on Escape or backdrop click, and restore
 focus to the trigger. Inputs use explicit labels, `aria-invalid`, and linked error text; toasts use
 a live region; toggle switches expose `role="switch"`.
 
@@ -381,10 +381,10 @@ a live region; toggle switches expose `role="switch"`.
 The interface has a deliberate pixel/terminal identity built on a small set of semantic tokens
 instead of per-component colors.
 
-- **Type**: Silkscreen for the brand, page titles, panel titles, and badges; Press Start 2P is
-  reserved for the logo tile; VT323 for numeric readouts (click counts, section indexes); IBM Plex
-  Mono for body copy, labels, and controls. Fonts load from Google Fonts with a system monospace
-  fallback, so the UI stays readable when the network is unavailable.
+- **Type**: Silkscreen for the brand, page titles, panel titles, and badges; Press Start 2P appears
+  only on the session-loader label; VT323 for numeric readouts (click counts, section indexes); IBM
+  Plex Mono for body copy, labels, and controls. Fonts load from Google Fonts with a system
+  monospace fallback, so the UI stays readable when the network is unavailable.
 - **Color**: warm off-white `#FAF9F6` and charcoal `#111210` canvases with a restrained sage accent
   (`#4F6B52` light, `#A6C5A0` dark). Components only use semantic utilities (`bg-canvas`,
   `text-muted`, `border-line`, `bg-accent-soft`, …) generated from `--snip-*` variables through
@@ -396,8 +396,11 @@ instead of per-component colors.
   `menuitemradio` items. Charts re-render with the palette that matches the active theme.
 - **Logo**: an original pixel "S" monogram drawn on a 5x7 grid inside a 32px tile, reused in the
   header, favicon, session screen, and the server-rendered 404/410 pages.
-- **Motion**: 150-220ms transitions on color, border, and transform only; `prefers-reduced-motion`
-  collapses them for modals, toasts, and skeletons.
+- **Icons**: 24px icons drawn by hand on a single grid in `client/src/components/Icons.tsx`, so the
+  client ships no icon package.
+- **Motion**: 150ms transitions on color, border, and transform; a 240ms cross-fade runs only while
+  the theme flips, and `prefers-reduced-motion` collapses all of it, including the spinner, modal,
+  and toast entrances.
 - **Accessibility**: one global `:focus-visible` outline, labelled icon-only buttons, `role="switch"`
   toggles, `aria-invalid` with `aria-describedby` on every field, state conveyed by text plus a
   square marker (never color alone), and a skip link to the main region.

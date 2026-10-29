@@ -32,7 +32,9 @@ export function FullPageLoader({ label }: { label: string }) {
       <LogoMark className="h-9 w-9" />
       <div className="flex items-center gap-2.5" role="status">
         <Spinner className="h-3 w-3 text-accent" />
-        <p className="eyebrow">{label}</p>
+        <p className="font-pixel text-[0.625rem] leading-none tracking-[0.04em] text-subtle uppercase">
+          {label}
+        </p>
       </div>
     </div>
   );
