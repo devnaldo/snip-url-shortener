@@ -1,11 +1,284 @@
 @import 'tailwindcss';
 
+/* Class-based dark mode: the theme provider (and the inline bootstrap script in
+   index.html) toggles `.dark` on <html> so the choice survives reloads. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---------------------------------------------------------------------------
+   Semantic design tokens.
+   Raw values live here so every component consumes the same semantic names.
+   --------------------------------------------------------------------------- */
+:root {
+  color-scheme: light;
+
+  /* Surfaces */
+  --snip-canvas: #faf9f6;
+  --snip-surface: #ffffff;
+  --snip-surface-2: #f3f1ec;
+  --snip-surface-3: #eae7df;
+
+  /* Text */
+  --snip-ink: #1f201d;
+  --snip-ink-muted: #5f625b;
+  --snip-ink-subtle: #6b6e66;
+
+  /* Lines */
+  --snip-line: #e6e3dc;
+  --snip-line-strong: #d3cfc5;
+
+  /* Brand */
+  --snip-accent: #4f6b52;
+  --snip-accent-hover: #3f5642;
+  --snip-accent-ink: #ffffff;
+  --snip-accent-soft: #e9efe6;
+
+  /* Status */
+  --snip-danger: #a33b33;
+  --snip-danger-hover: #8b2f28;
+  --snip-danger-ink: #ffffff;
+  --snip-danger-soft: #fbeeec;
+  --snip-success: #3b6b4a;
+  --snip-success-ink: #ffffff;
+  --snip-success-soft: #eaf2e8;
+  --snip-warn: #8a5f1f;
+  --snip-warn-soft: #fbf2e2;
+
+  /* Effects */
+  --snip-focus: #4f6b52;
+  --snip-backdrop: rgb(24 25 23 / 0.5);
+  --snip-grid-line: rgb(31 32 29 / 0.06);
+  --snip-shadow-panel: 0 1px 2px rgb(31 32 29 / 0.05);
+  --snip-shadow-overlay:
+    0 24px 48px -24px rgb(31 32 29 / 0.35), 0 2px 8px -2px rgb(31 32 29 / 0.12);
+}
+
+.dark {
+  color-scheme: dark;
+
+  --snip-canvas: #111210;
+  --snip-surface: #191a17;
+  --snip-surface-2: #20211d;
+  --snip-surface-3: #272822;
+
+  --snip-ink: #f1f0e9;
+  --snip-ink-muted: #a9aaa1;
+  --snip-ink-subtle: #8b8d83;
+
+  --snip-line: #2e2f29;
+  --snip-line-strong: #3e3f37;
+
+  --snip-accent: #a6c5a0;
+  --snip-accent-hover: #c1d9bb;
+  --snip-accent-ink: #101210;
+  --snip-accent-soft: #212a1f;
+
+  --snip-danger: #e79a91;
+  --snip-danger-hover: #f2b3ab;
+  --snip-danger-ink: #1b0f0d;
+  --snip-danger-soft: #2c1e1c;
+  --snip-success: #a6c5a0;
+  --snip-success-ink: #101210;
+  --snip-success-soft: #1e281d;
+  --snip-warn: #d8b471;
+  --snip-warn-soft: #2a2317;
+
+  --snip-focus: #a6c5a0;
+  --snip-backdrop: rgb(4 5 4 / 0.66);
+  --snip-grid-line: rgb(241 240 233 / 0.045);
+  --snip-shadow-panel: 0 1px 0 rgb(0 0 0 / 0.35);
+  --snip-shadow-overlay: 0 24px 56px -24px rgb(0 0 0 / 0.75), 0 2px 10px -2px rgb(0 0 0 / 0.55);
+}
+
+/* ---------------------------------------------------------------------------
+   Expose the tokens to Tailwind as semantic utilities + type/radius scales.
+   --------------------------------------------------------------------------- */
+@theme inline {
+  --font-sans: 'IBM Plex Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  --font-display: 'Silkscreen', 'IBM Plex Mono', ui-monospace, monospace;
+  --font-pixel: 'Press Start 2P', 'Silkscreen', ui-monospace, monospace;
+  --font-terminal: 'VT323', 'IBM Plex Mono', ui-monospace, monospace;
+
+  --color-canvas: var(--snip-canvas);
+  --color-surface: var(--snip-surface);
+  --color-surface-2: var(--snip-surface-2);
+  --color-surface-3: var(--snip-surface-3);
+  --color-ink: var(--snip-ink);
+  --color-muted: var(--snip-ink-muted);
+  --color-subtle: var(--snip-ink-subtle);
+  --color-line: var(--snip-line);
+  --color-line-strong: var(--snip-line-strong);
+  --color-accent: var(--snip-accent);
+  --color-accent-hover: var(--snip-accent-hover);
+  --color-accent-ink: var(--snip-accent-ink);
+  --color-accent-soft: var(--snip-accent-soft);
+  --color-danger: var(--snip-danger);
+  --color-danger-hover: var(--snip-danger-hover);
+  --color-danger-ink: var(--snip-danger-ink);
+  --color-danger-soft: var(--snip-danger-soft);
+  --color-success: var(--snip-success);
+  --color-success-ink: var(--snip-success-ink);
+  --color-success-soft: var(--snip-success-soft);
+  --color-warn: var(--snip-warn);
+  --color-warn-soft: var(--snip-warn-soft);
+  --color-focus: var(--snip-focus);
+  --color-backdrop: var(--snip-backdrop);
+
+  --radius-xs: 2px;
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 10px;
+  --radius-2xl: 14px;
+
+  --shadow-panel: var(--snip-shadow-panel);
+  --shadow-overlay: var(--snip-shadow-overlay);
+
+  --animate-panel-in: snip-panel-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-fade-in: snip-fade-in 160ms ease-out;
+  --animate-toast-in: snip-toast-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-block-blink: snip-block-blink 900ms steps(1, end) infinite;
+  --animate-skeleton: snip-skeleton 1.6s ease-in-out infinite;
+}
+
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
+    background-color: var(--snip-canvas);
   }
 
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
+    background-color: var(--snip-canvas);
+    color: var(--snip-ink);
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    font-feature-settings: 'zero' 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background-color: var(--snip-accent-soft);
+    color: var(--snip-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--snip-focus);
+    outline-offset: 2px;
+  }
+
+  ::placeholder {
+    color: var(--snip-ink-subtle);
+    opacity: 1;
+  }
+
+  /* Keep native date/time controls legible in dark mode. */
+  input[type='datetime-local']::-webkit-calendar-picker-indicator {
+    opacity: 0.55;
+  }
+
+  .dark input[type='datetime-local']::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    opacity: 0.7;
+  }
+}
+
+@layer components {
+  /* Small uppercase technical label used for section markers and metadata. */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    line-height: 1.2;
+    text-transform: uppercase;
+    color: var(--snip-ink-subtle);
+  }
+
+  /* Restrained technical grid used behind editorial panels. */
+  .grid-paper {
+    background-image:
+      linear-gradient(to right, var(--snip-grid-line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--snip-grid-line) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+}
+
+@keyframes snip-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes snip-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.995);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes snip-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes snip-block-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0.2;
+  }
+}
+
+@keyframes snip-skeleton {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+/* Cross-fade colours while the theme flips, then get out of the way so normal
+   hover transitions stay snappy. Scoped to the transition window only. */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition:
+    background-color 200ms ease-out,
+    border-color 200ms ease-out,
+    color 200ms ease-out,
+    fill 200ms ease-out,
+    stroke 200ms ease-out,
+    box-shadow 200ms ease-out !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

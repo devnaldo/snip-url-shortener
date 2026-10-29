@@ -2,34 +2,39 @@ export function cn(...values: Array<string | false | null | undefined>): string 
   return values.filter(Boolean).join(' ');
 }
 
+/** Shared text input treatment: consistent height, border, and hover/focus states. */
 export const inputClassName = (invalid = false): string =>
   cn(
-    'block w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition',
-    'placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20',
-    'disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500',
-    invalid ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-500/20' : 'border-slate-300',
+    'block h-9 w-full rounded-md border bg-surface px-3 text-[0.8125rem] text-ink',
+    'transition-colors duration-150 placeholder:text-subtle',
+    'hover:border-line-strong',
+    'disabled:cursor-not-allowed disabled:border-line disabled:bg-surface-2 disabled:text-subtle',
+    invalid ? 'border-danger' : 'border-line',
   );
 
-export const cardClassName = 'rounded-xl border border-slate-200 bg-white shadow-sm';
+export const cardClassName = 'rounded-lg border border-line bg-surface';
 
-export const focusRingClassName =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2';
+/** Small uppercase technical label, mirrored by the `.eyebrow` CSS class. */
+export const eyebrowClassName =
+  'font-mono text-[0.6875rem] font-medium uppercase leading-none tracking-[0.12em] text-subtle';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerGhost';
-export type ButtonSize = 'sm' | 'md' | 'icon';
+export type ButtonSize = 'sm' | 'md' | 'icon' | 'iconSm';
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
-  primary: 'bg-indigo-600 text-white hover:bg-indigo-700',
-  secondary: 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
-  ghost: 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
-  danger: 'bg-rose-600 text-white hover:bg-rose-700',
-  dangerGhost: 'border border-rose-200 bg-white text-rose-600 hover:bg-rose-50',
+  primary: 'bg-accent text-accent-ink hover:bg-accent-hover',
+  secondary: 'border border-line bg-surface text-ink hover:border-line-strong hover:bg-surface-2',
+  ghost: 'text-muted hover:bg-surface-2 hover:text-ink',
+  danger: 'bg-danger text-danger-ink hover:bg-danger-hover',
+  dangerGhost:
+    'border border-line bg-surface text-danger hover:border-danger/50 hover:bg-danger-soft',
 };
 
 const BUTTON_SIZES: Record<ButtonSize, string> = {
-  sm: 'px-2.5 py-1.5 text-xs',
-  md: 'px-3.5 py-2 text-sm',
+  sm: 'h-8 px-2.5 text-[0.75rem]',
+  md: 'h-9 px-3.5 text-[0.8125rem]',
   icon: 'h-8 w-8 p-0',
+  iconSm: 'h-7 w-7 p-0',
 };
 
 export function buttonClassName(
@@ -38,9 +43,9 @@ export function buttonClassName(
   extra?: string,
 ): string {
   return cn(
-    'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition',
-    'disabled:cursor-not-allowed disabled:opacity-50',
-    focusRingClassName,
+    'inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium',
+    'transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-out',
+    'active:translate-y-px disabled:pointer-events-none disabled:opacity-50',
     BUTTON_VARIANTS[variant],
     BUTTON_SIZES[size],
     extra,
