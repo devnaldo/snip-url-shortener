@@ -1,11 +1,22 @@
 import type { Express } from 'express';
 import request from 'supertest';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp, getClickQueue } from '../src/app.js';
 import type { Link } from '../src/db/schema.js';
+import type { ClickMetadata, ClickMetadataInput } from '../src/lib/click-metadata.js';
+import { logger } from '../src/lib/logger.js';
 import { clearRedirectCache } from '../src/lib/redirect-cache.js';
 import { insertClicks } from '../src/repositories/clicks.repository.js';
 import { findLinkByAlias } from '../src/repositories/links.repository.js';
+
+const metadataFailure = vi.hoisted(() => ({
+  shouldThrow: false,
+  error: new Error('Malformed click metadata'),
+}));
+
+interface ClickMetadataModule {
+  buildClickMetadata: (input: ClickMetadataInput) => ClickMetadata;
+}
 
 vi.mock('../src/repositories/links.repository.js', () => ({
   insertLink: vi.fn(),
@@ -20,6 +31,23 @@ vi.mock('../src/repositories/links.repository.js', () => ({
 vi.mock('../src/repositories/clicks.repository.js', () => ({
   insertClicks: vi.fn(),
 }));
+
+// Keep the real parser for normal tests, but allow a test to simulate a
+// malformed header that makes metadata extraction throw.
+vi.mock('../src/lib/click-metadata.js', async (importOriginal) => {
+  const actual = await importOriginal<ClickMetadataModule>();
+
+  return {
+    ...actual,
+    buildClickMetadata: (input: ClickMetadataInput) => {
+      if (metadataFailure.shouldThrow) {
+        throw metadataFailure.error;
+      }
+
+      return actual.buildClickMetadata(input);
+    },
+  };
+});
 
 const findLinkByAliasMock = vi.mocked(findLinkByAlias);
 const insertClicksMock = vi.mocked(insertClicks);
@@ -38,9 +66,14 @@ const IPAD_UA =
 let app: Express;
 
 beforeEach(() => {
+  metadataFailure.shouldThrow = false;
   vi.resetAllMocks();
   clearRedirectCache();
   app = createApp();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 function makeLink(overrides: Partial<Link> = {}): Link {
@@ -221,6 +254,50 @@ describe('GET /:alias', () => {
     expect(response.headers['location']).toBe('https://example.com/landing');
     await expect(drainClicks()).resolves.toBeUndefined();
     expect(insertClicksMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns 302 and logs when the click queue enqueue throws synchronously', async () => {
+    findLinkByAliasMock.mockResolvedValue(makeLink());
+
+    const queue = getClickQueue(app);
+    const enqueueError = new Error('queue is closed');
+    const enqueue = vi.spyOn(queue, 'enqueue').mockImplementation(() => {
+      throw enqueueError;
+    });
+    const errorSpy = vi.spyOn(logger, 'error');
+
+    const response = await request(app).get('/abc1234').set('User-Agent', CHROME_UA);
+
+    expect(response.status).toBe(302);
+    expect(response.headers['location']).toBe('https://example.com/landing');
+    expect(enqueue).toHaveBeenCalledTimes(1);
+    expect(errorSpy).toHaveBeenCalledWith({ err: enqueueError }, 'Failed to enqueue click event');
+
+    await drainClicks();
+    expect(queue.size).toBe(0);
+    expect(insertClicksMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 302 and logs when click metadata parsing throws', async () => {
+    findLinkByAliasMock.mockResolvedValue(makeLink());
+    const errorSpy = vi.spyOn(logger, 'error');
+    metadataFailure.shouldThrow = true;
+
+    const response = await request(app)
+      .get('/abc1234')
+      .set('User-Agent', 'Mozilla/5.0 (malformed user agent')
+      .set('Referer', 'not a valid referrer');
+
+    expect(response.status).toBe(302);
+    expect(response.headers['location']).toBe('https://example.com/landing');
+    expect(errorSpy).toHaveBeenCalledWith(
+      { err: metadataFailure.error },
+      'Failed to enqueue click event',
+    );
+
+    await drainClicks();
+    expect(getClickQueue(app).size).toBe(0);
+    expect(insertClicksMock).not.toHaveBeenCalled();
   });
 
   it('lets API routes win over the alias route', async () => {
