@@ -19,7 +19,29 @@ export function escapeHtml(value: string): string {
 }
 
 const STYLES = `
-:root { color-scheme: light dark; }
+:root {
+  color-scheme: light dark;
+  --bg: #faf9f6;
+  --surface: #ffffff;
+  --border: #e6e3dc;
+  --ink: #1f201d;
+  --muted: #5f625b;
+  --subtle: #74776f;
+  --accent: #4f6b52;
+  --accent-ink: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111210;
+    --surface: #191a17;
+    --border: #2e2f29;
+    --ink: #f1f0e9;
+    --muted: #a9aaa1;
+    --subtle: #8b8d83;
+    --accent: #a6c5a0;
+    --accent-ink: #101210;
+  }
+}
 * { box-sizing: border-box; }
 body {
   margin: 0;
@@ -28,57 +50,86 @@ body {
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  background: #f4f4f5;
-  color: #18181b;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
 }
 main {
   width: 100%;
-  max-width: 26rem;
-  padding: 2rem 1.5rem;
-  border: 1px solid #e4e4e7;
-  border-radius: 0.75rem;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  text-align: center;
+  max-width: 27rem;
+  padding: 1.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(31, 32, 29, 0.05);
 }
 .brand {
-  margin: 0 0 1.25rem;
-  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 1.75rem;
+  font-size: 0.8125rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #71717a;
+  color: var(--ink);
 }
+.brand svg { display: block; flex: none; }
 .status {
-  margin: 0;
-  font-size: 2.5rem;
-  font-weight: 700;
-  line-height: 1;
-  color: #a1a1aa;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--subtle);
+}
+.status::before {
+  content: "";
+  width: 0.375rem;
+  height: 0.375rem;
+  background: var(--accent);
 }
 h1 {
-  margin: 0.75rem 0 0.5rem;
-  font-size: 1.25rem;
-  line-height: 1.3;
+  margin: 0 0 0.5rem;
+  font-size: 1.125rem;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  color: var(--ink);
 }
 p {
   margin: 0;
-  font-size: 0.9375rem;
-  line-height: 1.5;
-  color: #52525b;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--muted);
 }
 .hint {
   margin-top: 1.5rem;
-  font-size: 0.8125rem;
-  color: #a1a1aa;
-}
-@media (prefers-color-scheme: dark) {
-  body { background: #18181b; color: #fafafa; }
-  main { background: #27272a; border-color: #3f3f46; }
-  p { color: #a1a1aa; }
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.75rem;
+  line-height: 1.6;
+  color: var(--subtle);
 }
 `.trim();
+
+const BRAND_MARK = `<svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+  <rect width="32" height="32" rx="2" fill="var(--accent)" />
+  <g fill="var(--accent-ink)" shape-rendering="crispEdges">
+    <rect x="10" y="2" width="12" height="4" />
+    <rect x="6" y="6" width="4" height="4" />
+    <rect x="22" y="6" width="4" height="4" />
+    <rect x="6" y="10" width="4" height="4" />
+    <rect x="10" y="14" width="12" height="4" />
+    <rect x="22" y="18" width="4" height="4" />
+    <rect x="6" y="22" width="4" height="4" />
+    <rect x="22" y="22" width="4" height="4" />
+    <rect x="10" y="26" width="12" height="4" />
+  </g>
+</svg>`;
 
 /** Render a standalone, escaped HTML page for redirect failures. */
 export function renderNoticePage(options: NoticePageOptions): string {
@@ -97,7 +148,7 @@ export function renderNoticePage(options: NoticePageOptions): string {
 </head>
 <body>
   <main>
-    <p class="brand">Snip</p>
+    <p class="brand">${BRAND_MARK}<span>Snip</span></p>
     <p class="status" aria-hidden="true">${options.statusCode}</p>
     <h1>${heading}</h1>
     <p>${message}</p>
