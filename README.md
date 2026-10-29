@@ -217,6 +217,139 @@ development only and are not suitable for a deployed database.
 | `npm run db:up`            | Start PostgreSQL with Docker Compose.                   |
 | `npm run db:down`          | Stop the compose stack.                                 |
 
+## Production deployment
+
+The deployment target is a single **Render Web Service** plus **Render PostgreSQL**. The same
+Express process serves the API, the redirect routes, and the built React client, so the browser only
+ever talks to one origin. There is no separate static-site or CDN deployment.
+
+### Architecture
+
+- **One Render web service** runs `server/dist/server.js` and serves `client/dist` through Express.
+- **Render PostgreSQL** is the only database. The service connects with `DATABASE_URL` and TLS
+  (`sslmode=require`).
+- **Same origin**: `BASE_URL` and `CLIENT_URL` point at the same `https://…onrender.com` origin. The
+  client calls relative `/api` URLs, the auth cookie is first-party, and CORS is limited to
+  `CLIENT_URL`.
+- **One instance**: the redirect LRU cache, click queue, and rate-limit counters are in process, so
+  the deployment assumes a single web instance rather than horizontal scaling.
+
+### Required environment variables
+
+Set these in the Render dashboard. Never commit their values.
+
+| Variable                    | Purpose                                                          | Production setting                                              |
+| --------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- |
+| `NODE_ENV`                  | Enables production validation, Secure cookies, and log defaults. | `production`                                                    |
+| `PORT`                      | HTTP port the Express server binds.                              | Provided by Render; do not hardcode it.                         |
+| `DATABASE_URL`              | PostgreSQL connection string for Render Postgres.                | Internal database URL with `?sslmode=require`.                  |
+| `BASE_URL`                  | Public origin used to build short links.                         | `https://<service>.onrender.com`, no trailing slash.            |
+| `CLIENT_URL`                | Origin allowed by CORS and used by the first-party client.       | Same value as `BASE_URL`, no trailing slash.                    |
+| `JWT_SECRET`                | Signs the httpOnly auth JWT.                                     | Unique secret, at least 32 characters (`openssl rand -hex 32`). |
+| `CLICK_HASH_SECRET`         | Derives the daily salt for unique-visitor hashes.                | Unique secret, at least 32 characters (`openssl rand -hex 32`). |
+| `TRUST_PROXY`               | Trusts the platform proxy when reading the client IP.            | `1` behind Render's proxy.                                      |
+| `LINK_RATE_LIMIT_MAX`       | Maximum links a user may create per window.                      | Optional; defaults to `20`.                                     |
+| `LINK_RATE_LIMIT_WINDOW_MS` | Link-creation rate-limit window in milliseconds.                 | Optional; defaults to `3600000` (one hour).                     |
+
+Production startup rejects HTTP `BASE_URL`/`CLIENT_URL` values, trailing slashes, and the
+placeholder secrets from `.env.example`.
+
+### Build and start commands
+
+Use the repository root as the Render root directory, with Node.js 20 or newer.
+
+```bash
+# Render build command (installs dev tooling needed by tsc and Vite)
+npm ci --include=dev && npm run build
+
+# Render start command
+npm run start:prod
+```
+
+`npm run build` compiles the server to `server/dist` and the client to `client/dist`.
+`start:prod` runs migrations first and starts the server only if they succeed. It never runs the
+demo seed.
+
+### How migrations run
+
+On every deploy/start, `npm run start:prod` executes:
+
+```bash
+node server/dist/db/migrate.js
+```
+
+The runner resolves the committed `server/drizzle` folder relative to the compiled file, applies
+pending Drizzle migrations, closes its pool, and exits non-zero on failure. Because `start:prod`
+uses `&&`, a failed migration prevents the new server process from starting and Render keeps the
+previous healthy deploy. Migrations are idempotent through Drizzle's journal, but the deployment
+still assumes one instance; do not run `migrate:prod` concurrently from multiple releases.
+
+### Seed demo data once
+
+After the first successful deploy, open a Render Shell from the repository root and run the compiled
+seed once:
+
+```bash
+node server/dist/db/seed.js
+```
+
+This optional command creates `demo1@example.com` and `demo2@example.com` (password `Demo@1234`),
+their demo links, and generated click history. It is idempotent for those two accounts but replaces
+their links and clicks, so run it only on a demo deployment, not against a real dataset. Production
+startup itself never seeds.
+
+### Proxy, cookie, and CSP assumptions
+
+- `TRUST_PROXY=1` trusts exactly one proxy hop, because Render terminates TLS and forwards the
+  request. This keeps `req.ip`, auth rate limits, and visitor hashes tied to the real client address.
+  Keep the service behind Render's proxy; do not expose it around the proxy.
+- The auth cookie is `httpOnly`, `SameSite=Lax`, `Secure` when `NODE_ENV=production`, path `/`, and
+  valid for seven days. It assumes a same-origin deployment. If the client and API are split across
+  origins, `SameSite=Lax` will not send the cookie on cross-site fetches, so that architecture would
+  require a deliberate CSRF and cookie review.
+- CORS allows credentials only for `CLIENT_URL`. `SameSite=Lax` is the current CSRF control for
+  state-changing requests.
+- Helmet's default CSP remains in force; the only loosened directive is
+  `img-src 'self' data: blob:` for authenticated QR object URLs. The build must not depend on
+  `unsafe-inline` or `unsafe-eval` scripts, and any new third-party script origin needs an explicit
+  CSP decision. The built `index.html` contains only an optional inline theme bootstrap, which the
+  default `script-src 'self'` blocks; the app still renders without it.
+
+### Free-tier cold starts and the click queue
+
+Render's free web instance spins down after inactivity. The next request pays a cold-start delay,
+usually tens of seconds. After the restart:
+
+- The redirect LRU cache is empty, so the first redirect performs one indexed database lookup before
+  responding.
+- The in-process click queue starts empty, and the rate-limit counters reset.
+- Clicks already accepted before shutdown are flushed on `SIGTERM` by the server's graceful shutdown
+  handler. A hard stop, crash, or platform timeout can lose whatever is still buffered; the queue
+  flushes every second or every 100 events, so the window is small but not zero.
+- There is no cross-instance queue or shared cache. A cold start cannot recover clicks that were
+  never written to PostgreSQL.
+
+### Rollback
+
+1. In Render, open **Deploys**, select the last known-good deploy, and choose **Redeploy**. This
+   redeploys the previous commit without rebuilding from an unknown state.
+2. The repository tag `local-benchmark` marks the pre-deployment baseline
+   (`29c6ffa`). Verify it locally with `git fetch --tags && git show --no-patch --oneline local-benchmark`.
+   If you need to redeploy that exact source, create a branch from the tag, push it, and point the
+   service at that branch:
+   ```bash
+   git switch -c rollback/local-benchmark local-benchmark
+   git push -u origin rollback/local-benchmark
+   ```
+3. Check `/health`, then smoke-test login, one existing alias redirect, and analytics.
+4. Migrations are forward-only. This deployment branch adds no schema migration, so reverting the
+   code is safe. For future releases that change schema, restore a database backup or ship a new
+   forward migration; do not edit the Drizzle journal by hand.
+
+### Live demo
+
+**Live demo:** _add the deployed Render URL here_
+
 ## API
 
 All API errors use one shape:
