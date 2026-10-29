@@ -151,11 +151,15 @@ The Vite dev server proxies `/api` and `/health` to the API, so the client can u
 
 ```bash
 npm run build
-npm start
+npm run start:prod
 ```
 
-`npm run build` compiles the server to `server/dist` and the client to `client/dist`. The Express
-server then serves the built client itself, from the same origin as the API:
+`npm run build` compiles the server to `server/dist` and the client to `client/dist`.
+`npm run start:prod` first applies the committed `server/drizzle` migrations with
+`server/dist/db/migrate.js`, then starts the compiled server only if migrations succeed. It never
+runs the demo seed. Use `npm start` when migrations are managed by your platform instead.
+
+The Express server serves the built client itself, from the same origin as the API:
 
 - Hashed files under `/assets/*` are served with `Cache-Control: public, max-age=31536000,
 immutable`; `index.html` is served with `Cache-Control: no-cache` so new deploys are picked up.
@@ -167,23 +171,28 @@ immutable`; `index.html` is served with `Cache-Control: no-cache` so new deploys
 - The CSP keeps Helmet's defaults and adds `blob:` to `img-src` (`'self' data: blob:`) for the
   authenticated QR-code object URLs. No other directive is loosened.
 
+With `NODE_ENV=production`, startup also requires `BASE_URL` and `CLIENT_URL` to be HTTPS URLs
+without trailing slashes, and refuses to start with the placeholder secrets from `.env.example`.
+For managed PostgreSQL, append `?sslmode=require` to `DATABASE_URL`; TLS certificate verification
+stays enabled.
+
 Because the client uses relative `/api` URLs and a `SameSite=Lax` cookie, a production deployment
 should terminate TLS at a reverse proxy and forward both the API and client requests to this server.
 
 ## Environment variables
 
-| Variable                    | Required | Default       | Description                                                      |
-| --------------------------- | -------- | ------------- | ---------------------------------------------------------------- |
-| `NODE_ENV`                  | no       | `development` | `development`, `test`, or `production`.                          |
-| `PORT`                      | no       | `3000`        | Port the API listens on.                                         |
-| `DATABASE_URL`              | yes      | —             | PostgreSQL connection string (`postgres://` or `postgresql://`). |
-| `BASE_URL`                  | yes      | —             | Public origin used to build short links.                         |
-| `CLIENT_URL`                | yes      | —             | Frontend origin allowed by CORS.                                 |
-| `JWT_SECRET`                | yes      | —             | Auth token signing key, minimum 32 characters.                   |
-| `CLICK_HASH_SECRET`         | yes      | —             | Secret used to derive the daily salt for visitor hashes.         |
-| `TRUST_PROXY`               | no       | `0`           | Number of trusted reverse-proxy hops for the client IP.          |
-| `LINK_RATE_LIMIT_MAX`       | no       | `20`          | Maximum links a user may create per window.                      |
-| `LINK_RATE_LIMIT_WINDOW_MS` | no       | `3600000`     | Link-creation rate-limit window in milliseconds.                 |
+| Variable                    | Required | Default       | Description                                                     |
+| --------------------------- | -------- | ------------- | --------------------------------------------------------------- |
+| `NODE_ENV`                  | no       | `development` | `development`, `test`, or `production`.                         |
+| `PORT`                      | no       | `3000`        | Port the API listens on.                                        |
+| `DATABASE_URL`              | yes      | —             | PostgreSQL URL; use `?sslmode=require` for managed TLS.         |
+| `BASE_URL`                  | yes      | —             | Public origin; HTTPS with no trailing slash in production.      |
+| `CLIENT_URL`                | yes      | —             | CORS origin; HTTPS with no trailing slash in production.        |
+| `JWT_SECRET`                | yes      | —             | Auth signing key; production rejects the `.env.example` value.  |
+| `CLICK_HASH_SECRET`         | yes      | —             | Visitor-hash salt; production rejects the `.env.example` value. |
+| `TRUST_PROXY`               | no       | `0`           | Number of trusted reverse-proxy hops for the client IP.         |
+| `LINK_RATE_LIMIT_MAX`       | no       | `20`          | Maximum links a user may create per window.                     |
+| `LINK_RATE_LIMIT_WINDOW_MS` | no       | `3600000`     | Link-creation rate-limit window in milliseconds.                |
 
 Never commit `.env`. It is ignored by Git; `.env.example` is the source of truth for configuration.
 The default `DATABASE_URL` matches `docker-compose.yml`; those credentials are for local
@@ -196,11 +205,13 @@ development only and are not suitable for a deployed database.
 | `npm run dev`              | Run the API and client together.                        |
 | `npm run build`            | Build the server and client for production.             |
 | `npm start`                | Start the compiled server (and serve the built client). |
+| `npm run start:prod`       | Apply production migrations, then start the server.     |
 | `npm test`                 | Run all workspace test suites.                          |
 | `npm run typecheck`        | Type-check every workspace.                             |
 | `npm run lint`             | Lint the repository with zero warnings allowed.         |
 | `npm run format`           | Format the repository with Prettier.                    |
 | `npm run migrate`          | Apply committed SQL migrations.                         |
+| `npm run migrate:prod`     | Apply migrations from the compiled production server.   |
 | `npm run migrate:generate` | Generate a migration from the Drizzle schema.           |
 | `npm run seed`             | Insert the demo accounts, links, and click history.     |
 | `npm run db:up`            | Start PostgreSQL with Docker Compose.                   |
