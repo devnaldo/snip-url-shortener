@@ -1,5 +1,5 @@
 import type { AnalyticsRange } from '../../api/types';
-import { cn, focusRingClassName } from '../../lib/styles';
+import { cn } from '../../lib/styles';
 
 const RANGES: Array<{ value: AnalyticsRange; label: string }> = [
   { value: '7d', label: '7 days' },
@@ -15,7 +15,7 @@ interface RangeSelectorProps {
 export function RangeSelector({ value, onChange }: RangeSelectorProps) {
   return (
     <div
-      className="inline-flex w-full rounded-lg border border-slate-200 bg-white p-1 shadow-sm sm:w-auto"
+      className="inline-flex w-full rounded-md border border-line bg-surface p-0.5 sm:w-auto"
       role="group"
       aria-label="Analytics range"
     >
@@ -29,11 +29,10 @@ export function RangeSelector({ value, onChange }: RangeSelectorProps) {
             aria-pressed={isActive}
             onClick={() => onChange(range.value)}
             className={cn(
-              'flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition sm:flex-none',
-              focusRingClassName,
+              'flex-1 rounded-sm px-3 py-1.5 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.1em] transition-colors duration-150 sm:flex-none',
               isActive
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+                ? 'bg-accent text-accent-ink'
+                : 'text-muted hover:bg-surface-2 hover:text-ink',
             )}
           >
             {range.label}

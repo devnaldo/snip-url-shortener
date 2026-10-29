@@ -1,7 +1,7 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import type { DeviceClicks } from '../../api/types';
-import { CHART_COLORS } from '../../lib/chart-colors';
 import { formatNumber } from '../../lib/format';
+import { useChartPalette } from '../../lib/use-chart-palette';
 
 const DEVICE_LABELS: Record<string, string> = {
   desktop: 'Desktop',
@@ -11,35 +11,43 @@ const DEVICE_LABELS: Record<string, string> = {
   unknown: 'Unknown',
 };
 
+const MONO = "'IBM Plex Mono', ui-monospace, monospace";
+
 interface DeviceChartProps {
   data: DeviceClicks[];
 }
 
 export function DeviceChart({ data }: DeviceChartProps) {
+  const palette = useChartPalette();
   const total = data.reduce((sum, row) => sum + row.clicks, 0);
 
   if (total === 0) {
-    return <p className="py-6 text-center text-sm text-slate-500">No device data yet.</p>;
+    return (
+      <p className="py-8 text-center font-mono text-[0.6875rem] uppercase tracking-[0.1em] text-subtle">
+        No device data yet
+      </p>
+    );
   }
 
   return (
-    <div className="grid items-center gap-3 sm:grid-cols-2">
-      <div className="h-[180px] w-full">
+    <div className="grid items-center gap-4 sm:grid-cols-2">
+      <div className="relative h-[172px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={data}
               dataKey="clicks"
               nameKey="deviceType"
-              innerRadius={48}
-              outerRadius={72}
-              paddingAngle={2}
-              stroke="none"
+              innerRadius={46}
+              outerRadius={70}
+              paddingAngle={data.length > 1 ? 2 : 0}
+              stroke={palette.surface}
+              strokeWidth={2}
             >
               {data.map((row, index) => (
                 <Cell
                   key={row.deviceType}
-                  fill={CHART_COLORS[index % CHART_COLORS.length] ?? '#64748b'}
+                  fill={palette.series[index % palette.series.length] ?? palette.muted}
                 />
               ))}
             </Pie>
@@ -49,32 +57,45 @@ export function DeviceChart({ data }: DeviceChartProps) {
                 DEVICE_LABELS[String(name)] ?? String(name),
               ]}
               contentStyle={{
-                borderRadius: 8,
-                borderColor: '#e2e8f0',
-                fontSize: 12,
+                borderRadius: 4,
+                borderColor: palette.line,
+                backgroundColor: palette.surface,
+                color: palette.ink,
+                fontSize: 11,
+                fontFamily: MONO,
+                boxShadow: palette.tooltipShadow,
               }}
+              itemStyle={{ color: palette.ink }}
             />
           </PieChart>
         </ResponsiveContainer>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <span className="font-terminal text-xl leading-none text-ink">{formatNumber(total)}</span>
+          <span className="mt-1 font-mono text-[0.5625rem] uppercase tracking-[0.14em] text-subtle">
+            clicks
+          </span>
+        </div>
       </div>
 
-      <ul className="space-y-2">
+      <ul className="space-y-2.5">
         {data.map((row, index) => (
-          <li key={row.deviceType} className="flex items-center justify-between gap-2 text-sm">
+          <li key={row.deviceType} className="flex items-center justify-between gap-2 text-xs">
             <span className="flex min-w-0 items-center gap-2">
               <span
-                className="h-2.5 w-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] ?? '#64748b' }}
                 aria-hidden="true"
+                className="h-2 w-2 shrink-0"
+                style={{
+                  backgroundColor: palette.series[index % palette.series.length] ?? palette.muted,
+                }}
               />
-              <span className="truncate text-slate-700">
+              <span className="truncate text-muted">
                 {DEVICE_LABELS[row.deviceType] ?? row.deviceType}
               </span>
             </span>
-            <span className="shrink-0 font-medium text-slate-900">
+            <span className="shrink-0 text-ink">
               {formatNumber(row.clicks)}
-              <span className="ml-1 text-xs font-normal text-slate-500">
-                ({Math.round((row.clicks / total) * 100)}%)
+              <span className="ml-1.5 text-[0.625rem] text-subtle">
+                {Math.round((row.clicks / total) * 100)}%
               </span>
             </span>
           </li>

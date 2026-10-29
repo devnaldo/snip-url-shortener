@@ -1,17 +1,26 @@
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { BrowserClicks } from '../../api/types';
 import { formatNumber, truncateMiddle } from '../../lib/format';
+import { useChartPalette } from '../../lib/use-chart-palette';
+
+const MONO = "'IBM Plex Mono', ui-monospace, monospace";
 
 interface BrowserChartProps {
   data: BrowserClicks[];
 }
 
 export function BrowserChart({ data }: BrowserChartProps) {
+  const palette = useChartPalette();
+
   if (data.length === 0) {
-    return <p className="py-6 text-center text-sm text-slate-500">No browser data yet.</p>;
+    return (
+      <p className="py-8 text-center font-mono text-[0.6875rem] uppercase tracking-[0.1em] text-subtle">
+        No browser data yet
+      </p>
+    );
   }
 
-  const height = Math.max(160, data.length * 36);
+  const height = Math.max(150, data.length * 34);
 
   return (
     <div style={{ height }} className="w-full">
@@ -21,21 +30,27 @@ export function BrowserChart({ data }: BrowserChartProps) {
           <YAxis
             type="category"
             dataKey="browser"
-            width={92}
+            width={96}
             tickLine={false}
             axisLine={false}
-            tick={{ fontSize: 11, fill: '#475569' }}
-            tickFormatter={(value) => truncateMiddle(String(value), 14)}
+            tick={{ fontSize: 10, fill: palette.muted, fontFamily: MONO }}
+            tickFormatter={(value) => truncateMiddle(String(value), 16)}
           />
           <Tooltip
             formatter={(value) => [formatNumber(Number(value)), 'Clicks']}
+            cursor={{ fill: palette.grid, fillOpacity: 0.5 }}
             contentStyle={{
-              borderRadius: 8,
-              borderColor: '#e2e8f0',
-              fontSize: 12,
+              borderRadius: 4,
+              borderColor: palette.line,
+              backgroundColor: palette.surface,
+              color: palette.ink,
+              fontSize: 11,
+              fontFamily: MONO,
+              boxShadow: palette.tooltipShadow,
             }}
+            itemStyle={{ color: palette.ink }}
           />
-          <Bar dataKey="clicks" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={16} />
+          <Bar dataKey="clicks" fill={palette.accent} radius={0} barSize={14} />
         </BarChart>
       </ResponsiveContainer>
     </div>
