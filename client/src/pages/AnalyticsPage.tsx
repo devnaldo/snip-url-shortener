@@ -173,7 +173,7 @@ export function AnalyticsPage() {
       <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="truncate text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+            <h1 className="break-all text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
               {link.alias}
             </h1>
             <LinkStatusBadge link={link} />

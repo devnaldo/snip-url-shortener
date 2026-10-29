@@ -64,11 +64,13 @@ export function DashboardPage() {
   function goToPage(nextPage: number) {
     if (nextPage === page) return;
     setStatus('loading');
+    setLinks([]);
     setPage(nextPage);
   }
 
   function handleCreated() {
     setStatus('loading');
+    setLinks([]);
     setPage(1);
     setReloadToken((token) => token + 1);
   }
@@ -119,30 +121,29 @@ export function DashboardPage() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
             Your links
           </h1>
           <p className="mt-1 text-sm text-slate-600">
             {status === 'ready'
-              ? pagination.total === 1
-                ? '1 link · clicks are tracked automatically.'
-                : `${pagination.total} links · clicks are tracked automatically.`
+              ? `${pagination.total} ${pagination.total === 1 ? 'link' : 'links'} · clicks tracked automatically.`
               : 'Create, share, and measure your short links.'}
           </p>
         </div>
         <Button
           variant="secondary"
           size="sm"
+          className="shrink-0"
           onClick={refresh}
-          isLoading={status === 'loading' && links.length > 0}
+          isLoading={status === 'loading'}
         >
           Refresh
         </Button>
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-start">
+      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] xl:items-start">
         <CreateLinkForm onCreated={handleCreated} />
 
         <section className="min-w-0 space-y-4" aria-labelledby="links-heading">

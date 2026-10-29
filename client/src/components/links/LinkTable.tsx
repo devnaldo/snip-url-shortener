@@ -25,13 +25,11 @@ export function LinkTable({
     <div className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm md:block">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+          <caption className="sr-only">Your links</caption>
           <thead className="bg-slate-50 text-xs font-medium uppercase tracking-wide text-slate-500">
             <tr>
               <th scope="col" className="px-4 py-3">
                 Link
-              </th>
-              <th scope="col" className="px-4 py-3">
-                Destination
               </th>
               <th scope="col" className="px-4 py-3">
                 Status
@@ -40,10 +38,7 @@ export function LinkTable({
                 Clicks
               </th>
               <th scope="col" className="px-4 py-3">
-                Created
-              </th>
-              <th scope="col" className="px-4 py-3">
-                Expires
+                Dates
               </th>
               <th scope="col" className="px-4 py-3 text-right">
                 Actions
@@ -53,8 +48,10 @@ export function LinkTable({
           <tbody className="divide-y divide-slate-100">
             {links.map((link) => (
               <tr key={link.id} className="align-top hover:bg-slate-50/70">
-                <td className="max-w-[14rem] px-4 py-3">
-                  <p className="truncate font-semibold text-slate-900">{link.alias}</p>
+                <td className="min-w-[12rem] px-4 py-3">
+                  <p className="break-all font-semibold text-slate-900" title={link.alias}>
+                    {link.alias}
+                  </p>
                   <a
                     href={link.shortUrl}
                     target="_blank"
@@ -63,13 +60,14 @@ export function LinkTable({
                   >
                     {link.shortUrl}
                   </a>
-                </td>
-                <td className="max-w-[16rem] px-4 py-3">
-                  <p className="truncate text-slate-700" title={link.destinationUrl}>
+                  <p
+                    className="mt-1 max-w-[22rem] truncate text-xs text-slate-500"
+                    title={link.destinationUrl}
+                  >
                     {link.destinationUrl}
                   </p>
                 </td>
-                <td className="px-4 py-3">
+                <td className="whitespace-nowrap px-4 py-3">
                   <div className="flex flex-col items-start gap-1.5">
                     <LinkStatusBadge link={link} />
                     <StatusToggle
@@ -83,21 +81,23 @@ export function LinkTable({
                 <td className="px-4 py-3 text-right font-medium text-slate-900">
                   {link.clickCount}
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                  {formatDate(link.createdAt)}
-                </td>
-                <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                  {link.expiresAt ? formatDateTime(link.expiresAt) : 'Never'}
+                <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600">
+                  <p>
+                    <span className="text-slate-400">Created</span> {formatDate(link.createdAt)}
+                  </p>
+                  <p className="mt-1">
+                    <span className="text-slate-400">Expires</span>{' '}
+                    {link.expiresAt ? formatDateTime(link.expiresAt) : 'Never'}
+                  </p>
                 </td>
                 <td className="px-4 py-3">
-                  <div className="flex justify-end">
-                    <LinkActions
-                      link={link}
-                      onEdit={() => onEdit(link)}
-                      onDelete={() => onDelete(link)}
-                      onShowQr={() => onShowQr(link)}
-                    />
-                  </div>
+                  <LinkActions
+                    compact
+                    link={link}
+                    onEdit={() => onEdit(link)}
+                    onDelete={() => onDelete(link)}
+                    onShowQr={() => onShowQr(link)}
+                  />
                 </td>
               </tr>
             ))}

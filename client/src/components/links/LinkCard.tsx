@@ -26,7 +26,9 @@ export function LinkCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="truncate text-sm font-semibold text-slate-900">{link.alias}</h3>
+            <h3 className="break-all text-sm font-semibold text-slate-900" title={link.alias}>
+              {link.alias}
+            </h3>
             <LinkStatusBadge link={link} />
           </div>
           <a

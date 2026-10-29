@@ -16,7 +16,7 @@ export const focusRingClassName =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerGhost';
-export type ButtonSize = 'sm' | 'md';
+export type ButtonSize = 'sm' | 'md' | 'icon';
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   primary: 'bg-indigo-600 text-white hover:bg-indigo-700',
@@ -29,6 +29,7 @@ const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
 const BUTTON_SIZES: Record<ButtonSize, string> = {
   sm: 'px-2.5 py-1.5 text-xs',
   md: 'px-3.5 py-2 text-sm',
+  icon: 'h-8 w-8 p-0',
 };
 
 export function buttonClassName(

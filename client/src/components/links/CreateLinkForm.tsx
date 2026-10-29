@@ -76,7 +76,7 @@ export function CreateLinkForm({ onCreated }: CreateLinkFormProps) {
   return (
     <section
       id="create-link"
-      className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 lg:sticky lg:top-20"
+      className="mx-auto w-full max-w-2xl rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 xl:sticky xl:top-20 xl:mx-0 xl:max-w-none"
     >
       <h2 className="text-base font-semibold text-slate-900">Create a link</h2>
       <p className="mt-1 text-sm text-slate-600">
