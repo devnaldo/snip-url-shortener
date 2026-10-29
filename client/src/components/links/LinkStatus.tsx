@@ -1,4 +1,4 @@
-import type { LinkListItem } from '../../api/types';
+import type { LinkDto } from '../../api/types';
 import { linkState } from '../../lib/link-state';
 import type { LinkState } from '../../lib/link-state';
 
@@ -14,7 +14,7 @@ const STATE_LABELS: Record<LinkState, string> = {
   expired: 'Expired',
 };
 
-export function LinkStatusBadge({ link }: { link: LinkListItem }) {
+export function LinkStatusBadge({ link }: { link: Pick<LinkDto, 'isActive' | 'expiresAt'> }) {
   const state = linkState(link);
 
   return (

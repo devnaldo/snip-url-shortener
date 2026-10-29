@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { GuestRoute, RequireAuth } from './auth/guards';
 import { Layout } from './components/Layout';
 import { DashboardPage } from './pages/DashboardPage';
+import { AnalyticsPage } from './pages/AnalyticsPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 
@@ -33,6 +34,7 @@ function App() {
         }
       >
         <Route index element={<DashboardPage />} />
+        <Route path="links/:id/analytics" element={<AnalyticsPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
