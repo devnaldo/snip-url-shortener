@@ -147,20 +147,52 @@ npm run dev
 
 The Vite dev server proxies `/api` and `/health` to the API, so the client can use relative URLs.
 
+### 6. Run a production build
+
+```bash
+npm run build
+npm run start:prod
+```
+
+`npm run build` compiles the server to `server/dist` and the client to `client/dist`.
+`npm run start:prod` first applies the committed `server/drizzle` migrations with
+`server/dist/db/migrate.js`, then starts the compiled server only if migrations succeed. It never
+runs the demo seed. Use `npm start` when migrations are managed by your platform instead.
+
+The Express server serves the built client itself, from the same origin as the API:
+
+- Hashed files under `/assets/*` are served with `Cache-Control: public, max-age=31536000,
+immutable`; `index.html` is served with `Cache-Control: no-cache` so new deploys are picked up.
+- The SPA fallback responds with `index.html` for `GET /`, `/login`, `/register`, and paths under
+  `/links/` only. There is deliberately no wildcard fallback: every other single-segment path still
+  reaches the alias redirect router, so `/abc1234` keeps working.
+- Static serving and the fallback are registered only when `client/dist/index.html` exists. Running
+  `npm run dev` or the test suite without a build therefore behaves exactly as before.
+- The CSP keeps Helmet's defaults and adds `blob:` to `img-src` (`'self' data: blob:`) for the
+  authenticated QR-code object URLs. No other directive is loosened.
+
+With `NODE_ENV=production`, startup also requires `BASE_URL` and `CLIENT_URL` to be HTTPS URLs
+without trailing slashes, and refuses to start with the placeholder secrets from `.env.example`.
+For managed PostgreSQL, append `?sslmode=require` to `DATABASE_URL`; TLS certificate verification
+stays enabled.
+
+Because the client uses relative `/api` URLs and a `SameSite=Lax` cookie, a production deployment
+should terminate TLS at a reverse proxy and forward both the API and client requests to this server.
+
 ## Environment variables
 
-| Variable                    | Required | Default       | Description                                                      |
-| --------------------------- | -------- | ------------- | ---------------------------------------------------------------- |
-| `NODE_ENV`                  | no       | `development` | `development`, `test`, or `production`.                          |
-| `PORT`                      | no       | `3000`        | Port the API listens on.                                         |
-| `DATABASE_URL`              | yes      | —             | PostgreSQL connection string (`postgres://` or `postgresql://`). |
-| `BASE_URL`                  | yes      | —             | Public origin used to build short links.                         |
-| `CLIENT_URL`                | yes      | —             | Frontend origin allowed by CORS.                                 |
-| `JWT_SECRET`                | yes      | —             | Auth token signing key, minimum 32 characters.                   |
-| `CLICK_HASH_SECRET`         | yes      | —             | Secret used to derive the daily salt for visitor hashes.         |
-| `TRUST_PROXY`               | no       | `0`           | Number of trusted reverse-proxy hops for the client IP.          |
-| `LINK_RATE_LIMIT_MAX`       | no       | `20`          | Maximum links a user may create per window.                      |
-| `LINK_RATE_LIMIT_WINDOW_MS` | no       | `3600000`     | Link-creation rate-limit window in milliseconds.                 |
+| Variable                    | Required | Default       | Description                                                     |
+| --------------------------- | -------- | ------------- | --------------------------------------------------------------- |
+| `NODE_ENV`                  | no       | `development` | `development`, `test`, or `production`.                         |
+| `PORT`                      | no       | `3000`        | Port the API listens on.                                        |
+| `DATABASE_URL`              | yes      | —             | PostgreSQL URL; use `?sslmode=require` for managed TLS.         |
+| `BASE_URL`                  | yes      | —             | Public origin; HTTPS with no trailing slash in production.      |
+| `CLIENT_URL`                | yes      | —             | CORS origin; HTTPS with no trailing slash in production.        |
+| `JWT_SECRET`                | yes      | —             | Auth signing key; production rejects the `.env.example` value.  |
+| `CLICK_HASH_SECRET`         | yes      | —             | Visitor-hash salt; production rejects the `.env.example` value. |
+| `TRUST_PROXY`               | no       | `0`           | Number of trusted reverse-proxy hops for the client IP.         |
+| `LINK_RATE_LIMIT_MAX`       | no       | `20`          | Maximum links a user may create per window.                     |
+| `LINK_RATE_LIMIT_WINDOW_MS` | no       | `3600000`     | Link-creation rate-limit window in milliseconds.                |
 
 Never commit `.env`. It is ignored by Git; `.env.example` is the source of truth for configuration.
 The default `DATABASE_URL` matches `docker-compose.yml`; those credentials are for local
@@ -168,20 +200,155 @@ development only and are not suitable for a deployed database.
 
 ## Scripts
 
-| Command                    | Description                                         |
-| -------------------------- | --------------------------------------------------- |
-| `npm run dev`              | Run the API and client together.                    |
-| `npm run build`            | Build the server and client for production.         |
-| `npm start`                | Start the compiled API.                             |
-| `npm test`                 | Run all workspace test suites.                      |
-| `npm run typecheck`        | Type-check every workspace.                         |
-| `npm run lint`             | Lint the repository with zero warnings allowed.     |
-| `npm run format`           | Format the repository with Prettier.                |
-| `npm run migrate`          | Apply committed SQL migrations.                     |
-| `npm run migrate:generate` | Generate a migration from the Drizzle schema.       |
-| `npm run seed`             | Insert the demo accounts, links, and click history. |
-| `npm run db:up`            | Start PostgreSQL with Docker Compose.               |
-| `npm run db:down`          | Stop the compose stack.                             |
+| Command                    | Description                                             |
+| -------------------------- | ------------------------------------------------------- |
+| `npm run dev`              | Run the API and client together.                        |
+| `npm run build`            | Build the server and client for production.             |
+| `npm start`                | Start the compiled server (and serve the built client). |
+| `npm run start:prod`       | Apply production migrations, then start the server.     |
+| `npm test`                 | Run all workspace test suites.                          |
+| `npm run typecheck`        | Type-check every workspace.                             |
+| `npm run lint`             | Lint the repository with zero warnings allowed.         |
+| `npm run format`           | Format the repository with Prettier.                    |
+| `npm run migrate`          | Apply committed SQL migrations.                         |
+| `npm run migrate:prod`     | Apply migrations from the compiled production server.   |
+| `npm run migrate:generate` | Generate a migration from the Drizzle schema.           |
+| `npm run seed`             | Insert the demo accounts, links, and click history.     |
+| `npm run db:up`            | Start PostgreSQL with Docker Compose.                   |
+| `npm run db:down`          | Stop the compose stack.                                 |
+
+## Production deployment
+
+The deployment target is a single **Render Web Service** plus **Render PostgreSQL**. The same
+Express process serves the API, the redirect routes, and the built React client, so the browser only
+ever talks to one origin. There is no separate static-site or CDN deployment.
+
+### Architecture
+
+- **One Render web service** runs `server/dist/server.js` and serves `client/dist` through Express.
+- **Render PostgreSQL** is the only database. The service connects with `DATABASE_URL` and TLS
+  (`sslmode=require`).
+- **Same origin**: `BASE_URL` and `CLIENT_URL` point at the same `https://…onrender.com` origin. The
+  client calls relative `/api` URLs, the auth cookie is first-party, and CORS is limited to
+  `CLIENT_URL`.
+- **One instance**: the redirect LRU cache, click queue, and rate-limit counters are in process, so
+  the deployment assumes a single web instance rather than horizontal scaling.
+
+### Required environment variables
+
+Set these in the Render dashboard. Never commit their values.
+
+| Variable                    | Purpose                                                          | Production setting                                              |
+| --------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- |
+| `NODE_ENV`                  | Enables production validation, Secure cookies, and log defaults. | `production`                                                    |
+| `PORT`                      | HTTP port the Express server binds.                              | Provided by Render; do not hardcode it.                         |
+| `DATABASE_URL`              | PostgreSQL connection string for Render Postgres.                | Internal database URL with `?sslmode=require`.                  |
+| `BASE_URL`                  | Public origin used to build short links.                         | `https://<service>.onrender.com`, no trailing slash.            |
+| `CLIENT_URL`                | Origin allowed by CORS and used by the first-party client.       | Same value as `BASE_URL`, no trailing slash.                    |
+| `JWT_SECRET`                | Signs the httpOnly auth JWT.                                     | Unique secret, at least 32 characters (`openssl rand -hex 32`). |
+| `CLICK_HASH_SECRET`         | Derives the daily salt for unique-visitor hashes.                | Unique secret, at least 32 characters (`openssl rand -hex 32`). |
+| `TRUST_PROXY`               | Trusts the platform proxy when reading the client IP.            | `1` behind Render's proxy.                                      |
+| `LINK_RATE_LIMIT_MAX`       | Maximum links a user may create per window.                      | Optional; defaults to `20`.                                     |
+| `LINK_RATE_LIMIT_WINDOW_MS` | Link-creation rate-limit window in milliseconds.                 | Optional; defaults to `3600000` (one hour).                     |
+
+Production startup rejects HTTP `BASE_URL`/`CLIENT_URL` values, trailing slashes, and the
+placeholder secrets from `.env.example`.
+
+### Build and start commands
+
+Use the repository root as the Render root directory, with Node.js 20 or newer.
+
+```bash
+# Render build command (installs dev tooling needed by tsc and Vite)
+npm ci --include=dev && npm run build
+
+# Render start command
+npm run start:prod
+```
+
+`npm run build` compiles the server to `server/dist` and the client to `client/dist`.
+`start:prod` runs migrations first and starts the server only if they succeed. It never runs the
+demo seed.
+
+### How migrations run
+
+On every deploy/start, `npm run start:prod` executes:
+
+```bash
+node server/dist/db/migrate.js
+```
+
+The runner resolves the committed `server/drizzle` folder relative to the compiled file, applies
+pending Drizzle migrations, closes its pool, and exits non-zero on failure. Because `start:prod`
+uses `&&`, a failed migration prevents the new server process from starting and Render keeps the
+previous healthy deploy. Migrations are idempotent through Drizzle's journal, but the deployment
+still assumes one instance; do not run `migrate:prod` concurrently from multiple releases.
+
+### Seed demo data once
+
+After the first successful deploy, open a Render Shell from the repository root and run the compiled
+seed once:
+
+```bash
+node server/dist/db/seed.js
+```
+
+This optional command creates `demo1@example.com` and `demo2@example.com` (password `Demo@1234`),
+their demo links, and generated click history. It is idempotent for those two accounts but replaces
+their links and clicks, so run it only on a demo deployment, not against a real dataset. Production
+startup itself never seeds.
+
+### Proxy, cookie, and CSP assumptions
+
+- `TRUST_PROXY=1` trusts exactly one proxy hop, because Render terminates TLS and forwards the
+  request. This keeps `req.ip`, auth rate limits, and visitor hashes tied to the real client address.
+  Keep the service behind Render's proxy; do not expose it around the proxy.
+- The auth cookie is `httpOnly`, `SameSite=Lax`, `Secure` when `NODE_ENV=production`, path `/`, and
+  valid for seven days. It assumes a same-origin deployment. If the client and API are split across
+  origins, `SameSite=Lax` will not send the cookie on cross-site fetches, so that architecture would
+  require a deliberate CSRF and cookie review.
+- CORS allows credentials only for `CLIENT_URL`. `SameSite=Lax` is the current CSRF control for
+  state-changing requests.
+- Helmet's default CSP remains in force; the only loosened directive is
+  `img-src 'self' data: blob:` for authenticated QR object URLs. The build must not depend on
+  `unsafe-inline` or `unsafe-eval` scripts, and any new third-party script origin needs an explicit
+  CSP decision. The built `index.html` contains only an optional inline theme bootstrap, which the
+  default `script-src 'self'` blocks; the app still renders without it.
+
+### Free-tier cold starts and the click queue
+
+Render's free web instance spins down after inactivity. The next request pays a cold-start delay,
+usually tens of seconds. After the restart:
+
+- The redirect LRU cache is empty, so the first redirect performs one indexed database lookup before
+  responding.
+- The in-process click queue starts empty, and the rate-limit counters reset.
+- Clicks already accepted before shutdown are flushed on `SIGTERM` by the server's graceful shutdown
+  handler. A hard stop, crash, or platform timeout can lose whatever is still buffered; the queue
+  flushes every second or every 100 events, so the window is small but not zero.
+- There is no cross-instance queue or shared cache. A cold start cannot recover clicks that were
+  never written to PostgreSQL.
+
+### Rollback
+
+1. In Render, open **Deploys**, select the last known-good deploy, and choose **Redeploy**. This
+   redeploys the previous commit without rebuilding from an unknown state.
+2. The repository tag `local-benchmark` marks the pre-deployment baseline
+   (`29c6ffa`). Verify it locally with `git fetch --tags && git show --no-patch --oneline local-benchmark`.
+   If you need to redeploy that exact source, create a branch from the tag, push it, and point the
+   service at that branch:
+   ```bash
+   git switch -c rollback/local-benchmark local-benchmark
+   git push -u origin rollback/local-benchmark
+   ```
+3. Check `/health`, then smoke-test login, one existing alias redirect, and analytics.
+4. Migrations are forward-only. This deployment branch adds no schema migration, so reverting the
+   code is safe. For future releases that change schema, restore a database backup or ship a new
+   forward migration; do not edit the Drizzle journal by hand.
+
+### Live demo
+
+**Live demo:** _add the deployed Render URL here_
 
 ## API
 
@@ -580,8 +747,8 @@ The client is type-checked and built with `npm run typecheck --workspace=@snip/c
 - **Safer defaults**: secrets must be explicitly provided and have a minimum length; there are no
   insecure fallback secrets.
 - **Client and API share an origin**: the client uses relative `/api` URLs rather than a build-time
-  API host. In production, serve the built client and proxy `/api` to the API from the same origin;
-  this matches the `SameSite=Lax` auth cookie and avoids CORS/cookie complications.
+  API host, and the Express server serves the built client when `client/dist` exists. This matches the
+  `SameSite=Lax` auth cookie and avoids CORS/cookie complications.
 - **Server errors drive the client forms**: the UI maps `error.fields` back to inputs instead of
   duplicating server validation rules, so the server remains the source of truth.
 - **Analytics is code-split**: Recharts and the analytics screen are loaded only when that route is
@@ -604,14 +771,15 @@ The client is type-checked and built with `npm run typecheck --workspace=@snip/c
 - Per-link SVG QR codes with authenticated download.
 - Responsive React client with guarded routes, inline server validation errors, toasts, link
   management, analytics charts, and QR download.
+- Production delivery of the built client from Express, with hashed-asset caching, `no-cache` HTML,
+  an explicit SPA fallback, and a default Helmet CSP that permits QR blob images.
 - Unit and PostgreSQL-backed integration tests, deterministic demo seed data, and this README.
 
 ## What is not finished
 
 - Browser-level end-to-end tests (Playwright or similar) for the full register → create → redirect →
   analytics → QR flow.
-- A production deployment: reverse proxy, TLS, CSP tuned to the built client, secrets management,
-  backups, and a CI pipeline.
+- A production deployment: reverse proxy, TLS, secrets management, backups, and a CI pipeline.
 - Distributed infrastructure: the LRU cache, click queue, and rate-limit store are in-process and
   assume a single API instance.
 - DNS-aware SSRF protection. Private-host blocking currently checks literals and hostnames without
@@ -630,8 +798,8 @@ The client is type-checked and built with `npm run typecheck --workspace=@snip/c
    use a shared rate-limit store, and load-test the redirect path under concurrent traffic.
 3. Add observability: request and redirect latency histograms, cache hit ratio, queue depth, dropped
    click counts, database slow-query logging, and alerts for queue failures.
-4. Harden deployment with a same-origin reverse proxy, a strict CSP, managed secrets, automated
-   backups, and migration rollback procedures.
+4. Harden deployment with a same-origin reverse proxy, TLS, managed secrets, automated backups, and
+   migration rollback procedures.
 5. Add DNS-aware destination checks and outbound egress restrictions to close the remaining SSRF
    gap.
 6. Add email verification, password reset, account deletion, and token revocation for a complete

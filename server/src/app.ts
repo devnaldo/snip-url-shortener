@@ -5,6 +5,7 @@ import type { Express } from 'express';
 import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
 import { env } from './config/env.js';
+import { mountClientApp } from './lib/client-assets.js';
 import { ClickQueue } from './lib/click-queue.js';
 import { logger } from './lib/logger.js';
 import { errorHandler, notFoundHandler } from './middleware/error-handler.js';
@@ -23,7 +24,17 @@ export function createApp(): Express {
   // X-Forwarded-For. 0 (the default) ignores forwarding headers entirely.
   app.set('trust proxy', env.TRUST_PROXY);
 
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        useDefaults: true,
+        directives: {
+          // The QR modal renders authenticated SVG responses from object URLs.
+          'img-src': ["'self'", 'data:', 'blob:'],
+        },
+      },
+    }),
+  );
   app.use(
     cors({
       origin(origin, callback) {
@@ -47,6 +58,11 @@ export function createApp(): Express {
   app.use('/health', healthRouter);
   app.use('/api/auth', createAuthRouter());
   app.use('/api/links', createLinksRouter());
+
+  // Serve the built React app when it is present. Static files and the SPA
+  // fallback are intentionally mounted before the alias router but after the
+  // API routes, and the fallback only claims the client's known routes.
+  mountClientApp(app);
 
   // Mounted last so API and health routes always win over an alias. The
   // router itself only claims a single path segment.

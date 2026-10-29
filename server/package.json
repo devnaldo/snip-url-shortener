@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "migrate": "drizzle-kit migrate",
+    "migrate:prod": "node dist/db/migrate.js",
     "migrate:generate": "drizzle-kit generate",
     "seed": "tsx src/db/seed.ts"
   },
