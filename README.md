@@ -59,6 +59,17 @@ path. The project is built as an npm-workspaces monorepo with a React client and
 - npm 10 or newer
 - Docker with the Compose plugin, for the local database
 
+Docker Desktop bundles the Compose plugin. On Linux, install the `docker-compose-plugin` package
+from Docker's repository (or use a recent Docker Engine package that includes it) and verify it is
+available:
+
+```bash
+docker compose version
+```
+
+If only the legacy standalone binary is installed, the commands in this README use the modern
+`docker compose` form; substitute `docker-compose` if that is what your machine provides.
+
 ### 1. Install dependencies
 
 ```bash
@@ -90,12 +101,39 @@ The compose stack exposes PostgreSQL on `localhost:5432` with the development cr
 `DATABASE_URL`. Compose also accepts optional `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`,
 and `POSTGRES_PORT` overrides; the defaults match `.env.example`.
 
+> The credentials in `docker-compose.yml` and `.env.example` are for local development only. They
+> are not secrets and must not be reused for a deployed database.
+
 ### 4. Migrate and seed
 
 ```bash
 npm run migrate
-npm run seed   # optional demo user and links
+npm run seed   # optional demo accounts, links, and click history
 ```
+
+The seed is idempotent and safe to run repeatedly: it upserts the demo users, replaces only those
+users' links, and regenerates their clicks. Re-running it does not duplicate rows.
+
+### Demo accounts
+
+`npm run seed` creates two local-only accounts:
+
+| Email               | Password    |
+| ------------------- | ----------- |
+| `demo1@example.com` | `Demo@1234` |
+| `demo2@example.com` | `Demo@1234` |
+
+Each account has eight readable links: six active links with about 500 clicks spread over the last
+30 days, one expired link (inserted directly with a past expiry because the API rejects past dates),
+and one disabled link. Clicks include Direct, twitter.com, google.com, linkedin.com, and reddit.com
+referrers plus a mix of desktop, mobile, tablet, and bot traffic.
+
+Sample short links after seeding (using the default `BASE_URL`):
+
+- <http://localhost:3000/demo1-docs>
+- <http://localhost:3000/demo1-launch>
+- <http://localhost:3000/demo1-portfolio>
+- <http://localhost:3000/demo2-docs>
 
 ### 5. Run the apps
 
@@ -125,6 +163,8 @@ The Vite dev server proxies `/api` and `/health` to the API, so the client can u
 | `LINK_RATE_LIMIT_WINDOW_MS` | no       | `3600000`     | Link-creation rate-limit window in milliseconds.                 |
 
 Never commit `.env`. It is ignored by Git; `.env.example` is the source of truth for configuration.
+The default `DATABASE_URL` matches `docker-compose.yml`; those credentials are for local
+development only and are not suitable for a deployed database.
 
 ## Scripts
 
@@ -139,7 +179,7 @@ Never commit `.env`. It is ignored by Git; `.env.example` is the source of truth
 | `npm run format`           | Format the repository with Prettier.                |
 | `npm run migrate`          | Apply committed SQL migrations.                     |
 | `npm run migrate:generate` | Generate a migration from the Drizzle schema.       |
-| `npm run seed`             | Insert the demo user and sample links (idempotent). |
+| `npm run seed`             | Insert the demo accounts, links, and click history. |
 | `npm run db:up`            | Start PostgreSQL with Docker Compose.               |
 | `npm run db:down`          | Stop the compose stack.                             |
 
@@ -367,13 +407,44 @@ analytics product.
 - Migrations: `server/drizzle/` (generated, committed)
 - Seed: `server/src/db/seed.ts`
 
-Seed credentials for local development only:
-
-- Email: `demo@snip.local`
-- Password: `demo-password`
-
 Change the schema, run `npm run migrate:generate`, review the generated SQL, then apply it with
 `npm run migrate`.
+
+### Data model
+
+PostgreSQL stores three tables. All timestamps are `timestamptz`; UUID primary keys use
+`gen_random_uuid()`.
+
+| Table    | Columns                                                                                                                                                                       |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users`  | `id` uuid PK, `email` varchar(320) unique, `password_hash` text, `created_at` timestamptz                                                                                     |
+| `links`  | `id` uuid PK, `user_id` uuid FK → `users.id`, `alias` varchar(32), `destination_url` text, `is_active` boolean, `expires_at` timestamptz nullable, `created_at`, `updated_at` |
+| `clicks` | `id` bigserial PK, `link_id` uuid FK → `links.id`, `clicked_at` timestamptz, `referrer_host`, `referrer_url`, `device_type`, `browser`, `os`, `visitor_hash`                  |
+
+Relationships and indexes:
+
+- One user owns many links; one link has many clicks. Deleting a user cascades to links, and
+  deleting a link cascades to its clicks.
+- `links_alias_unique_idx` is a unique index on `links(alias)`. Alias uniqueness is case-sensitive.
+- `links_user_created_idx` on `links(user_id, created_at DESC)` supports paginated per-user lists.
+- `clicks_link_clicked_idx` on `clicks(link_id, clicked_at)` supports every analytics window and
+  keeps the redirect's alias lookup independent of click volume.
+- Clicks are append-only. Analytics totals, daily buckets, referrers, and device/browser splits are
+  aggregated in SQL rather than maintained in denormalized counters.
+
+### Seed data
+
+`npm run seed` is idempotent. It upserts `demo1@example.com` and `demo2@example.com`, deletes only
+those users' links (clicks cascade), and reinserts the demo links and generated click history. It
+never touches other accounts, and re-running it does not create duplicates.
+
+- Password for both accounts: `Demo@1234`.
+- Each account has eight links: six active, one expired, and one disabled.
+- Active links receive 500 deterministic demo clicks spread over the last 30 UTC days, weighted
+  toward recent days, with Direct, twitter.com, google.com, linkedin.com, and reddit.com referrers.
+- The expired link is inserted directly with a past `expires_at`; the API intentionally rejects
+  past expiry dates.
+- These accounts and the compose database credentials are for local development only.
 
 ## Testing
 
@@ -429,13 +500,35 @@ The client is type-checked and built with `npm run typecheck --workspace=@snip/c
 
 - **npm workspaces**: one lockfile and root scripts, while each workspace keeps its own dependencies.
 - **Single root `.env`**: shared by the API, Drizzle CLI, and tooling; loaded relative to the repo.
-- **20 links/hour default rate limit**: applied per authenticated user, configurable via
-  environment without a code change.
-- **Link ownership is enforced in SQL**: list, count, find, update, and delete all include
-  `user_id` in the `WHERE` clause, so another user's link cannot be distinguished from missing.
-  Analytics and QR resolve the owned link first and return `404` before touching click data.
-- **Analytics windows are UTC-aligned**: ranges end at the current UTC day, `to` is exclusive, and
-  `generate_series` fills empty days in SQL so every response has a fixed number of buckets.
+- **`302` instead of `301`**: a permanent redirect would be cached by browsers and later clicks
+  would never reach the API, making analytics incomplete. A temporary redirect keeps every click
+  observable; the trade-off is one extra request per click.
+- **In-memory LRU cache plus a batched click queue**: the redirect path checks a 60-second LRU cache
+  and falls back to one indexed query. Clicks are enqueued synchronously after the response and
+  batch-inserted every second, at 100 events, or on shutdown. The queue is bounded and failures are
+  logged and discarded, so analytics can never block or fail a redirect. This is intentionally a
+  single-process design.
+- **Redis upgrade path**: for multiple API instances, replace the LRU with a shared Redis cache
+  (`GET`/`SETEX` on the alias key) and move the in-process queue to a durable Redis Stream or
+  BullMQ queue drained by workers. Invalidate cache entries with `DEL` and/or a pub/sub broadcast on
+  edit, disable, enable, and delete. The HTTP layer stays the same; only the cache and queue adapters
+  change.
+- **UTC-aligned analytics buckets**: ranges cover the current UTC day plus the preceding days,
+  `from` is inclusive and `to` is exclusive, and `generate_series` fills empty days in SQL so every
+  response has a fixed number of buckets. UTC avoids daylight-saving gaps and makes daily visitor
+  salt rotation deterministic.
+- **Per-user link-creation rate limit**: `POST /api/links` is keyed by the authenticated user id,
+  not by IP, so users behind a shared NAT do not consume each other's quota. The default is 20 per
+  hour and is configurable via `LINK_RATE_LIMIT_MAX` and `LINK_RATE_LIMIT_WINDOW_MS`. Login and
+  registration remain IP-keyed because there is no authenticated user yet.
+- **Hashed visitor IDs**: a visitor id is `sha256(ip + user-agent + daily salt)`, where the salt is
+  an HMAC of the UTC date keyed by `CLICK_HASH_SECRET`. Raw IPs are never stored or logged. Unique
+  visitors are distinct hashes within the selected window; because the salt rotates daily, the
+  count resets at UTC midnight.
+- **`404` instead of `403` for other users' links**: every read, update, delete, analytics, and QR
+  query is scoped by `user_id` in SQL. Another user's link is indistinguishable from a missing link,
+  so the API does not reveal that an id exists. This also avoids leaking resource ownership through
+  status codes.
 - **QR codes are SVG**: the server returns text-based SVG instead of rasterising a PNG, keeping the
   endpoint dependency-light and the code sharp at any display size.
 - **Alias rules**: uniqueness is case-sensitive in PostgreSQL, while reserved words are checked
@@ -464,10 +557,57 @@ The client is type-checked and built with `npm run typecheck --workspace=@snip/c
 - **QR images are authenticated blobs**: the SVG is fetched with the session cookie and rendered
   from an object URL, then revoked on close. No QR service sees the short URL or the cookie.
 
-## Next steps
+## What is finished
 
-1. Add browser-level end-to-end tests for register, login, link CRUD, QR download, and analytics.
-2. Add deployment hardening: a reverse proxy that serves the client and proxies `/api`, a
-   production rate-limit store, and CSP tuned to the deployed assets.
-3. Revisit private-host blocking with DNS resolution if deployments allow user-supplied
-   destinations that could target internal services.
+- Email/password authentication with bcrypt cost 12, httpOnly `SameSite=Lax` JWT cookies, logout,
+  session lookup, and IP rate limits on register/login.
+- Link management: generated or custom aliases, future-only expiry, pagination, click counts,
+  editing, enable/disable, deletion, and strict per-user ownership.
+- Redirects: `302` for active links, escaped `410` pages for expired/disabled links, escaped `404`
+  pages for unknown aliases, a 60-second LRU cache, and cache invalidation on every mutation.
+- Click tracking: asynchronous batched inserts, UA/referrer parsing, device/browser/OS fields, and
+  daily-rotating hashed visitor ids without storing raw IPs.
+- Analytics: totals, unique visitors, gap-filled daily buckets, top referrers, device split, browser
+  split, and `7d`/`30d`/`90d` ranges.
+- Per-link SVG QR codes with authenticated download.
+- Responsive React client with guarded routes, inline server validation errors, toasts, link
+  management, analytics charts, and QR download.
+- Unit and PostgreSQL-backed integration tests, deterministic demo seed data, and this README.
+
+## What is not finished
+
+- Browser-level end-to-end tests (Playwright or similar) for the full register → create → redirect →
+  analytics → QR flow.
+- A production deployment: reverse proxy, TLS, CSP tuned to the built client, secrets management,
+  backups, and a CI pipeline.
+- Distributed infrastructure: the LRU cache, click queue, and rate-limit store are in-process and
+  assume a single API instance.
+- DNS-aware SSRF protection. Private-host blocking currently checks literals and hostnames without
+  resolving DNS, so a public hostname that resolves to an internal address is out of scope.
+- Account lifecycle features: email verification, password reset, account deletion, and refresh
+  tokens or server-side session revocation.
+- Durable analytics delivery guarantees. The queue is bounded and drops events under sustained
+  database failure; there are no queue-depth metrics or alerts yet.
+- OpenAPI/JSON Schema documentation and a generated API client.
+
+## What I would do with more time
+
+1. Add Playwright end-to-end tests and run lint, typecheck, unit, and integration tests in CI on
+   every pull request.
+2. Replace the in-process cache and queue with Redis (`GET`/`SETEX` plus Redis Streams or BullMQ),
+   use a shared rate-limit store, and load-test the redirect path under concurrent traffic.
+3. Add observability: request and redirect latency histograms, cache hit ratio, queue depth, dropped
+   click counts, database slow-query logging, and alerts for queue failures.
+4. Harden deployment with a same-origin reverse proxy, a strict CSP, managed secrets, automated
+   backups, and migration rollback procedures.
+5. Add DNS-aware destination checks and outbound egress restrictions to close the remaining SSRF
+   gap.
+6. Add email verification, password reset, account deletion, and token revocation for a complete
+   account lifecycle.
+7. Publish an OpenAPI spec and generate the client types from it so the API and UI cannot drift.
+
+## AI tools used
+
+OpenCode and Claude were used for scaffolding, implementation, and review. I reviewed and understand
+all code in this repository, including the architecture, the redirect and click-tracking path, the
+analytics SQL, the authentication and ownership rules, and the tests.
