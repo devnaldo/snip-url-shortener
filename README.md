@@ -356,7 +356,7 @@ Dashboard:
 
 - Create a link with a destination, optional custom alias, and optional expiry. Server field
   errors appear inline, while rate-limit and other request failures also surface as toasts.
-- Links render as cards below `md` and as a table from `md` upward. Each row supports copy,
+- Links render as cards below `lg` and as a table from `lg` upward. Each row supports copy,
   enable/disable (switch), edit, delete with confirmation, QR display, and analytics.
 - Deleting the last item on a page moves back one page; the list refreshes after mutations so
   pagination totals stay accurate.
@@ -375,6 +375,35 @@ wrapping action buttons, full-width range controls, scrollable tables on medium 
 bottom-sheet modals on phones. Modals trap focus, close on Escape or backdrop click, and restore
 focus to the trigger. Inputs use explicit labels, `aria-invalid`, and linked error text; toasts use
 a live region; toggle switches expose `role="switch"`.
+
+### Design system
+
+The interface has a deliberate pixel/terminal identity built on a small set of semantic tokens
+instead of per-component colors.
+
+- **Type**: Silkscreen for the brand, page titles, panel titles, and badges; Press Start 2P is
+  reserved for the logo tile; VT323 for numeric readouts (click counts, section indexes); IBM Plex
+  Mono for body copy, labels, and controls. Fonts load from Google Fonts with a system monospace
+  fallback, so the UI stays readable when the network is unavailable.
+- **Color**: warm off-white `#FAF9F6` and charcoal `#111210` canvases with a restrained sage accent
+  (`#4F6B52` light, `#A6C5A0` dark). Components only use semantic utilities (`bg-canvas`,
+  `text-muted`, `border-line`, `bg-accent-soft`, …) generated from `--snip-*` variables through
+  `@theme inline` in `client/src/index.css`. Charts mirror the same values in
+  `client/src/lib/chart-colors.ts` because SVG attributes need concrete colors.
+- **Theme**: light, dark, or system, persisted under `snip-theme`. A small inline script in
+  `index.html` resolves the mode before first paint, `ThemeProvider` keeps the `.dark` class and
+  `<meta name="theme-color">` in sync, and the header control is a keyboard-operable `menu` of
+  `menuitemradio` items. Charts re-render with the palette that matches the active theme.
+- **Logo**: an original pixel "S" monogram drawn on a 5x7 grid inside a 32px tile, reused in the
+  header, favicon, session screen, and the server-rendered 404/410 pages.
+- **Motion**: 150-220ms transitions on color, border, and transform only; `prefers-reduced-motion`
+  collapses them for modals, toasts, and skeletons.
+- **Accessibility**: one global `:focus-visible` outline, labelled icon-only buttons, `role="switch"`
+  toggles, `aria-invalid` with `aria-describedby` on every field, state conveyed by text plus a
+  square marker (never color alone), and a skip link to the main region.
+
+`!important` appears only in two defensive rules: the temporary cross-fade class applied while the
+theme flips, and the reduced-motion override. Both are documented in `index.css`.
 
 ## Architecture
 
