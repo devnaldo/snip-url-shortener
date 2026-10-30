@@ -10,6 +10,17 @@ const isPostgresUrl = (value: string): boolean => {
   }
 };
 
+const REQUIRED_TLS_SSLMODES: ReadonlySet<string> = new Set(['require', 'verify-ca', 'verify-full']);
+
+const hasProductionTls = (value: string): boolean => {
+  try {
+    const sslmode = new URL(value).searchParams.get('sslmode');
+    return sslmode !== null && REQUIRED_TLS_SSLMODES.has(sslmode);
+  } catch {
+    return false;
+  }
+};
+
 // Must match the production placeholders shipped in .env.example. They are
 // fine for local development but must never reach a production deployment.
 const PLACEHOLDER_SECRETS: ReadonlySet<string> = new Set([
@@ -45,6 +56,15 @@ export const envSchema = z
   .superRefine((value, context) => {
     if (value.NODE_ENV !== 'production') {
       return;
+    }
+
+    if (!hasProductionTls(value.DATABASE_URL)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['DATABASE_URL'],
+        message:
+          'Must include sslmode=require, sslmode=verify-ca, or sslmode=verify-full in production',
+      });
     }
 
     for (const key of ['BASE_URL', 'CLIENT_URL'] as const) {

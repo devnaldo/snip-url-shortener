@@ -20,6 +20,7 @@ const BASE_ENV = {
 const PRODUCTION_ENV = {
   ...BASE_ENV,
   NODE_ENV: 'production',
+  DATABASE_URL: 'postgresql://snip:secret@db.example.com:5432/snip?sslmode=require',
   BASE_URL: 'https://snip.example.com',
   CLIENT_URL: 'https://snip.example.com',
 };
@@ -81,5 +82,38 @@ describe('production environment validation', () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it.each(['require', 'verify-ca', 'verify-full'])(
+    'accepts DATABASE_URL with sslmode=%s in production',
+    (sslmode) => {
+      const result = envSchema.safeParse({
+        ...PRODUCTION_ENV,
+        DATABASE_URL: `postgresql://snip:secret@db.example.com:5432/snip?sslmode=${sslmode}`,
+      });
+
+      expect(result.success).toBe(true);
+    },
+  );
+
+  it.each([
+    ['no sslmode', 'postgresql://snip:secret@db.example.com:5432/snip'],
+    ['sslmode=disable', 'postgresql://snip:secret@db.example.com:5432/snip?sslmode=disable'],
+    ['sslmode=prefer', 'postgresql://snip:secret@db.example.com:5432/snip?sslmode=prefer'],
+    ['sslmode=allow', 'postgresql://snip:secret@db.example.com:5432/snip?sslmode=allow'],
+    [
+      'an unrecognized sslmode',
+      'postgresql://snip:secret@db.example.com:5432/snip?sslmode=verify-ca2',
+    ],
+  ])('rejects DATABASE_URL with %s in production', (_label, databaseUrl) => {
+    const result = envSchema.safeParse({ ...PRODUCTION_ENV, DATABASE_URL: databaseUrl });
+
+    expect(result.success).toBe(false);
+    expect(issuePaths(result)).toContain('DATABASE_URL');
+  });
+
+  it('keeps development and test working without sslmode', () => {
+    expect(parse({ NODE_ENV: 'development' }).success).toBe(true);
+    expect(parse({ NODE_ENV: 'test' }).success).toBe(true);
   });
 });
