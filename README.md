@@ -312,8 +312,8 @@ startup itself never seeds.
 - Helmet's default CSP remains in force; the only loosened directive is
   `img-src 'self' data: blob:` for authenticated QR object URLs. The build must not depend on
   `unsafe-inline` or `unsafe-eval` scripts, and any new third-party script origin needs an explicit
-  CSP decision. The built `index.html` contains only an optional inline theme bootstrap, which the
-  default `script-src 'self'` blocks; the app still renders without it.
+  CSP decision. The theme bootstrap is loaded from `/theme-init.js` as a blocking script, so it
+  satisfies `script-src 'self'` without inline scripts.
 
 ### Free-tier cold starts and the click queue
 
@@ -557,10 +557,10 @@ instead of per-component colors.
   `text-muted`, `border-line`, `bg-accent-soft`, …) generated from `--snip-*` variables through
   `@theme inline` in `client/src/index.css`. Charts mirror the same values in
   `client/src/lib/chart-colors.ts` because SVG attributes need concrete colors.
-- **Theme**: light, dark, or system, persisted under `snip-theme`. A small inline script in
-  `index.html` resolves the mode before first paint, `ThemeProvider` keeps the `.dark` class and
-  `<meta name="theme-color">` in sync, and the header control is a keyboard-operable `menu` of
-  `menuitemradio` items. Charts re-render with the palette that matches the active theme.
+- **Theme**: light, dark, or system, persisted under `snip-theme`. A small blocking script at
+  `public/theme-init.js` resolves the mode before first paint, `ThemeProvider` keeps the `.dark`
+  class and `<meta name="theme-color">` in sync, and the header control is a keyboard-operable
+  `menu` of `menuitemradio` items. Charts re-render with the palette that matches the active theme.
 - **Logo**: an original pixel "S" monogram drawn on a 5x7 grid inside a 32px tile, reused in the
   header, favicon, session screen, and the server-rendered 404/410 pages.
 - **Icons**: 24px icons drawn by hand on a single grid in `client/src/components/Icons.tsx`, so the
