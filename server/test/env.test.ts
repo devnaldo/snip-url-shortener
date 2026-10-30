@@ -55,6 +55,26 @@ describe('production environment validation', () => {
   });
 
   it.each([
+    ['embedded credentials', 'https://user:secret@snip.example.com'],
+    ['a username without a password', 'https://user@snip.example.com'],
+    ['a path', 'https://snip.example.com/dashboard'],
+    ['a query string', 'https://snip.example.com?ref=demo'],
+    ['a hash fragment', 'https://snip.example.com#top'],
+    ['localhost', 'https://localhost'],
+    ['a .localhost host', 'https://app.localhost'],
+    ['a loopback IPv4 address', 'https://127.0.0.1'],
+    ['a loopback IPv4 address in the 127/8 range', 'https://127.10.20.30'],
+    ['a loopback IPv6 address', 'https://[::1]'],
+  ])('rejects %s in production BASE_URL and CLIENT_URL', (_label, value) => {
+    for (const key of ['BASE_URL', 'CLIENT_URL'] as const) {
+      const result = envSchema.safeParse({ ...PRODUCTION_ENV, [key]: value });
+
+      expect(result.success).toBe(false);
+      expect(issuePaths(result)).toContain(key);
+    }
+  });
+
+  it.each([
     ['JWT_SECRET', JWT_PLACEHOLDER],
     ['CLICK_HASH_SECRET', CLICK_HASH_PLACEHOLDER],
   ])('rejects the .env.example placeholder for %s', (key, value) => {

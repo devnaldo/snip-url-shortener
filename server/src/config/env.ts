@@ -1,3 +1,4 @@
+import { BlockList, isIP } from 'node:net';
 import { z } from 'zod';
 import './load-env.js';
 
@@ -28,16 +29,56 @@ const PLACEHOLDER_SECRETS: ReadonlySet<string> = new Set([
   'change-me-click-hash-secret-at-least-32-chars',
 ]);
 
-const isProductionHttpsUrl = (value: string): boolean => {
+const loopbackAddresses = new BlockList();
+loopbackAddresses.addSubnet('127.0.0.0', 8, 'ipv4');
+loopbackAddresses.addAddress('::1', 'ipv6');
+
+function isLoopbackHost(hostname: string): boolean {
+  const host = hostname
+    .toLowerCase()
+    .replace(/^\[|\]$/g, '')
+    .replace(/\.+$/, '');
+
+  if (host === 'localhost' || host.endsWith('.localhost')) {
+    return true;
+  }
+
+  const version = isIP(host);
+
+  if (version === 4) {
+    return loopbackAddresses.check(host, 'ipv4');
+  }
+
+  if (version === 6) {
+    return loopbackAddresses.check(host, 'ipv6');
+  }
+
+  return false;
+}
+
+const isProductionOrigin = (value: string): boolean => {
   if (value.endsWith('/')) {
     return false;
   }
 
+  let url: URL;
+
   try {
-    return new URL(value).protocol === 'https:';
+    url = new URL(value);
   } catch {
     return false;
   }
+
+  return (
+    url.protocol === 'https:' &&
+    url.origin === value &&
+    url.username === '' &&
+    url.password === '' &&
+    url.pathname === '/' &&
+    url.search === '' &&
+    url.hash === '' &&
+    !isLoopbackHost(url.hostname)
+  );
 };
 
 export const envSchema = z
@@ -68,11 +109,12 @@ export const envSchema = z
     }
 
     for (const key of ['BASE_URL', 'CLIENT_URL'] as const) {
-      if (!isProductionHttpsUrl(value[key])) {
+      if (!isProductionOrigin(value[key])) {
         context.addIssue({
           code: 'custom',
           path: [key],
-          message: 'Must be an https URL without a trailing slash in production',
+          message:
+            'Must be an https origin without credentials, path, query, hash, localhost, or a loopback address in production',
         });
       }
     }
