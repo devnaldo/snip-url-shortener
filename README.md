@@ -13,13 +13,13 @@ path. The project is built as an npm-workspaces monorepo with a React client and
 
 ## Stack
 
-| Layer    | Technology                                                                   |
-| -------- | ---------------------------------------------------------------------------- |
-| Server   | Node.js 20+, Express 5, TypeScript (strict), Zod, pino                       |
-| Database | PostgreSQL 16, Drizzle ORM, SQL migrations committed to the repo             |
-| Client   | React 19, React Router, Vite, TypeScript, Tailwind CSS, Recharts             |
-| Testing  | Vitest, Supertest                                                            |
-| Tooling  | npm workspaces, ESLint (type-aware), Prettier, Docker Compose for PostgreSQL |
+| Layer    | Technology                                                                         |
+| -------- | ---------------------------------------------------------------------------------- |
+| Server   | Node.js 20+, Express 5, TypeScript (strict), Zod, pino                             |
+| Database | PostgreSQL (Neon in production), Drizzle ORM, SQL migrations committed to the repo |
+| Client   | React 19, React Router, Vite, TypeScript, Tailwind CSS, Recharts                   |
+| Testing  | Vitest, Supertest                                                                  |
+| Tooling  | npm workspaces, ESLint (type-aware), Prettier, Docker Compose for PostgreSQL       |
 
 ## Project structure
 
@@ -171,10 +171,12 @@ immutable`; `index.html` is served with `Cache-Control: no-cache` so new deploys
 - The CSP keeps Helmet's defaults and adds `blob:` to `img-src` (`'self' data: blob:`) for the
   authenticated QR-code object URLs. No other directive is loosened.
 
-With `NODE_ENV=production`, startup also requires `BASE_URL` and `CLIENT_URL` to be HTTPS URLs
-without trailing slashes, and refuses to start with the placeholder secrets from `.env.example`.
-For managed PostgreSQL, append `?sslmode=require` to `DATABASE_URL`; TLS certificate verification
-stays enabled.
+With `NODE_ENV=production`, startup also requires `BASE_URL` and `CLIENT_URL` to be exact HTTPS
+origins without credentials, paths, queries, hashes, trailing slashes, localhost, or loopback hosts,
+and it refuses to start with the placeholder secrets from `.env.example`. `DATABASE_URL` must include
+`sslmode=require` (or `sslmode=verify-ca`/`sslmode=verify-full`); certificate verification stays
+enabled. `npm run start:prod` sets `NODE_ENV=production` for both the migration and the server so a
+missing platform variable cannot silently disable these checks.
 
 Because the client uses relative `/api` URLs and a `SameSite=Lax` cookie, a production deployment
 should terminate TLS at a reverse proxy and forward both the API and client requests to this server.
@@ -185,7 +187,7 @@ should terminate TLS at a reverse proxy and forward both the API and client requ
 | --------------------------- | -------- | ------------- | --------------------------------------------------------------- |
 | `NODE_ENV`                  | no       | `development` | `development`, `test`, or `production`.                         |
 | `PORT`                      | no       | `3000`        | Port the API listens on.                                        |
-| `DATABASE_URL`              | yes      | —             | PostgreSQL URL; use `?sslmode=require` for managed TLS.         |
+| `DATABASE_URL`              | yes      | —             | PostgreSQL URL; production requires `?sslmode=require`.         |
 | `BASE_URL`                  | yes      | —             | Public origin; HTTPS with no trailing slash in production.      |
 | `CLIENT_URL`                | yes      | —             | CORS origin; HTTPS with no trailing slash in production.        |
 | `JWT_SECRET`                | yes      | —             | Auth signing key; production rejects the `.env.example` value.  |
@@ -219,15 +221,15 @@ development only and are not suitable for a deployed database.
 
 ## Production deployment
 
-The deployment target is a single **Render Web Service** plus **Render PostgreSQL**. The same
-Express process serves the API, the redirect routes, and the built React client, so the browser only
-ever talks to one origin. There is no separate static-site or CDN deployment.
+The deployment target is a single **Render Web Service** plus a **Neon PostgreSQL** database. The
+same Express process serves the API, the redirect routes, and the built React client, so the browser
+only ever talks to one origin. There is no separate static-site or CDN deployment.
 
 ### Architecture
 
 - **One Render web service** runs `server/dist/server.js` and serves `client/dist` through Express.
-- **Render PostgreSQL** is the only database. The service connects with `DATABASE_URL` and TLS
-  (`sslmode=require`).
+- **Neon PostgreSQL** is the only database. The service connects with `DATABASE_URL`, which must
+  include `sslmode=require`; `sslmode=verify-ca` and `sslmode=verify-full` are also accepted.
 - **Same origin**: `BASE_URL` and `CLIENT_URL` point at the same `https://…onrender.com` origin. The
   client calls relative `/api` URLs, the auth cookie is first-party, and CORS is limited to
   `CLIENT_URL`.
@@ -236,13 +238,14 @@ ever talks to one origin. There is no separate static-site or CDN deployment.
 
 ### Required environment variables
 
-Set these in the Render dashboard. Never commit their values.
+Set these in the Render dashboard; copy `DATABASE_URL` from the Neon project. Never commit their
+values.
 
 | Variable                    | Purpose                                                          | Production setting                                              |
 | --------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- |
 | `NODE_ENV`                  | Enables production validation, Secure cookies, and log defaults. | `production`                                                    |
 | `PORT`                      | HTTP port the Express server binds.                              | Provided by Render; do not hardcode it.                         |
-| `DATABASE_URL`              | PostgreSQL connection string for Render Postgres.                | Internal database URL with `?sslmode=require`.                  |
+| `DATABASE_URL`              | Neon PostgreSQL connection string.                               | `postgresql://…/snip?sslmode=require` (TLS is required).        |
 | `BASE_URL`                  | Public origin used to build short links.                         | `https://<service>.onrender.com`, no trailing slash.            |
 | `CLIENT_URL`                | Origin allowed by CORS and used by the first-party client.       | Same value as `BASE_URL`, no trailing slash.                    |
 | `JWT_SECRET`                | Signs the httpOnly auth JWT.                                     | Unique secret, at least 32 characters (`openssl rand -hex 32`). |
@@ -251,8 +254,9 @@ Set these in the Render dashboard. Never commit their values.
 | `LINK_RATE_LIMIT_MAX`       | Maximum links a user may create per window.                      | Optional; defaults to `20`.                                     |
 | `LINK_RATE_LIMIT_WINDOW_MS` | Link-creation rate-limit window in milliseconds.                 | Optional; defaults to `3600000` (one hour).                     |
 
-Production startup rejects HTTP `BASE_URL`/`CLIENT_URL` values, trailing slashes, and the
-placeholder secrets from `.env.example`.
+Production startup rejects HTTP `BASE_URL`/`CLIENT_URL` values, trailing slashes, credentials, paths,
+queries, hashes, localhost/loopback hosts, the placeholder secrets from `.env.example`, and a
+`DATABASE_URL` whose `sslmode` is missing or not one of `require`, `verify-ca`, or `verify-full`.
 
 ### Build and start commands
 
@@ -267,8 +271,8 @@ npm run start:prod
 ```
 
 `npm run build` compiles the server to `server/dist` and the client to `client/dist`.
-`start:prod` runs migrations first and starts the server only if they succeed. It never runs the
-demo seed.
+`start:prod` sets `NODE_ENV=production` for both commands, runs migrations first, and starts the
+server only if they succeed. It never runs the demo seed.
 
 ### How migrations run
 
@@ -328,6 +332,29 @@ usually tens of seconds. After the restart:
   flushes every second or every 100 events, so the window is small but not zero.
 - There is no cross-instance queue or shared cache. A cold start cannot recover clicks that were
   never written to PostgreSQL.
+
+### Known risks and accepted tradeoffs
+
+- **Public demo credentials.** The live demo seeds `demo1@example.com` and `demo2@example.com` with
+  the documented password `Demo@1234`. Anyone can sign in, view those accounts' demo links and
+  analytics, and create links that consume the public rate-limit quota. The demo deployment is
+  intentionally disposable; do not reuse these credentials for real data.
+- **In-memory rate limits reset on cold start.** Link-creation, login, and registration counters live
+  in the process. A cold start or redeploy clears them, so limits are best-effort and can be bypassed
+  by forcing restarts or by running more than one instance.
+- **Single-instance migration and click-queue assumptions.** Migrations run on every start without a
+  distributed lock, and queued clicks exist only in one process. Overlapping deploys or multiple
+  instances could race migrations, split or lose queued clicks, and keep separate caches. Run exactly
+  one instance and let a failed migration block the deploy.
+- **`TRUST_PROXY=1` relies on the platform proxy.** One proxy hop is trusted so `req.ip`, auth rate
+  limits, and visitor hashes use the forwarded client address. If the service is reachable without
+  Render's proxy, clients can spoof `X-Forwarded-For`; keep it behind the proxy or set `TRUST_PROXY`
+  to the real hop count.
+- **Development dependencies are present at runtime.** The build installs with `--include=dev` and
+  the runtime uses the same dependency tree, so TypeScript, Vite, and test tooling remain installed in
+  production. This keeps the single-stage deploy simple at the cost of image size and a larger
+  supply-chain surface; a multi-stage runtime install of production dependencies only would be the
+  next hardening step.
 
 ### Rollback
 
