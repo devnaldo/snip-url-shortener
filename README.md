@@ -375,7 +375,7 @@ usually tens of seconds. After the restart:
 
 ### Live demo
 
-**Live demo:** _add the deployed Render URL here_
+**Live demo:** (https://snip-e7it.onrender.com)
 
 ## API
 
