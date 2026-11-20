@@ -126,7 +126,7 @@ users' links, and regenerates their clicks. Re-running it does not duplicate row
 Each account has eight readable links: six active links with about 500 clicks spread over the last
 30 days, one expired link (inserted directly with a past expiry because the API rejects past dates),
 and one disabled link. Clicks include Direct, twitter.com, google.com, linkedin.com, and reddit.com
-referrers plus a mix of desktop, mobile, tablet, and bot traffic.
+referrers plus a mix of the desktop, mobile, tablet, and bot traffic.
 
 Sample short links after seeding (using the default `BASE_URL`):
 
